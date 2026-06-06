@@ -1,20 +1,23 @@
 import crypto from 'crypto'
 
-if (!process.env.PHONEPE_CLIENT_ID || !process.env.PHONEPE_CLIENT_SECRET) {
-  throw new Error('PHONEPE_CLIENT_ID and PHONEPE_CLIENT_SECRET must be set before starting the server.')
-}
-
 const BASE_URL =
   process.env.PHONEPE_ENV === 'PRODUCTION'
     ? 'https://api.phonepe.com/apis/hermes'
     : 'https://api-preprod.phonepe.com/apis/pg-sandbox'
 
-const CLIENT_ID = process.env.PHONEPE_CLIENT_ID
-const CLIENT_SECRET = process.env.PHONEPE_CLIENT_SECRET
 const CLIENT_VERSION = Number(process.env.PHONEPE_CLIENT_VERSION ?? 1)
 
-function generateChecksum(payload: string, endpoint: string): string {
-  const data = payload + endpoint + CLIENT_SECRET
+function getCredentials(): { clientId: string; clientSecret: string } {
+  const clientId     = process.env.PHONEPE_CLIENT_ID
+  const clientSecret = process.env.PHONEPE_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
+    throw new Error('PHONEPE_CLIENT_ID and PHONEPE_CLIENT_SECRET must be set.')
+  }
+  return { clientId, clientSecret }
+}
+
+function generateChecksum(payload: string, endpoint: string, clientSecret: string): string {
+  const data = payload + endpoint + clientSecret
   return crypto.createHash('sha256').update(data).digest('hex') + '###' + CLIENT_VERSION
 }
 
@@ -28,8 +31,10 @@ export interface InitiatePaymentParams {
 }
 
 export async function initiatePayment(params: InitiatePaymentParams) {
+  const { clientId, clientSecret } = getCredentials()
+
   const payload = {
-    merchantId: CLIENT_ID,
+    merchantId: clientId,
     merchantTransactionId: params.transactionId,
     merchantUserId: params.userId,
     amount: params.amountPaise,
@@ -42,7 +47,7 @@ export async function initiatePayment(params: InitiatePaymentParams) {
 
   const base64Payload = Buffer.from(JSON.stringify(payload)).toString('base64')
   const endpoint = '/pg/v1/pay'
-  const checksum = generateChecksum(base64Payload, endpoint)
+  const checksum = generateChecksum(base64Payload, endpoint, clientSecret)
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method: 'POST',
@@ -60,8 +65,9 @@ export function verifyCallbackChecksum(
   responseBody: string,
   receivedChecksum: string
 ): boolean {
+  const { clientSecret } = getCredentials()
   const endpoint = '/pg/v1/pay'
-  const expected = generateChecksum(responseBody, endpoint)
+  const expected = generateChecksum(responseBody, endpoint, clientSecret)
   try {
     return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(receivedChecksum))
   } catch {
@@ -70,14 +76,15 @@ export function verifyCallbackChecksum(
 }
 
 export async function checkPaymentStatus(transactionId: string) {
-  const endpoint = `/pg/v1/status/${CLIENT_ID}/${transactionId}`
-  const checksum = generateChecksum('', endpoint)
+  const { clientId, clientSecret } = getCredentials()
+  const endpoint = `/pg/v1/status/${clientId}/${transactionId}`
+  const checksum = generateChecksum('', endpoint, clientSecret)
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
       'X-VERIFY': checksum,
-      'X-MERCHANT-ID': CLIENT_ID,
+      'X-MERCHANT-ID': clientId,
     },
   })
 
