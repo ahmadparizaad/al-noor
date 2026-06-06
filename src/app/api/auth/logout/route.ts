@@ -7,7 +7,9 @@ export async function POST() {
   if (session?.user?.id) {
     // Revoke all refresh tokens in DB — even if client's cookie is stolen,
     // the refresh token is dead and cannot be rotated into a new session.
-    await revokeAllRefreshTokens(session.user.id).catch(() => {})
+    await revokeAllRefreshTokens(session.user.id).catch((err: unknown) => {
+      console.error('[auth] Failed to revoke refresh tokens on logout for user', session.user.id, err)
+    })
   }
 
   // Auth.js handles clearing the session cookie via signOut on the client.

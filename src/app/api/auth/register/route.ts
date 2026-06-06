@@ -28,7 +28,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = registerSchema.safeParse(body)
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 400 })
+    const details = process.env.NODE_ENV === 'development' ? parsed.error.flatten() : undefined
+    return NextResponse.json({ error: 'Invalid input', ...(details && { details }) }, { status: 400 })
   }
 
   const { name, email, password, phone } = parsed.data

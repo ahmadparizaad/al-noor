@@ -53,7 +53,11 @@ function ConfirmationInner() {
 
     async function fetchStatus() {
       try {
-        const res  = await fetch(`/api/orders/${orderId}`)
+        // x-guest-token lets unauthenticated users view their own guest order.
+        // The token is the orderId itself — matches the check in orders/[id]/route.ts.
+        const res  = await fetch(`/api/orders/${orderId}`, {
+          headers: { 'x-guest-token': orderId },
+        })
         const data = await res.json()
         if (!res.ok) { setPayStatus('failed'); setError(data.error ?? 'Could not load order.'); return }
         setOrder(data)
