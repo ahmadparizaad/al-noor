@@ -8,6 +8,16 @@ const PROTECTED_PATHS = ['/orders', '/account', '/profile', '/api/orders', '/api
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // 1. Redirect /admin bare path first — before any auth check
+  if (pathname === '/admin') {
+    return NextResponse.redirect(new URL('/admin/dashboard', req.url))
+  }
+
+  // 2. Skip auth check for admin login page itself (avoid redirect loop)
+  if (pathname === '/admin/login') {
+    return NextResponse.next()
+  }
+
   // Decode JWT from session cookie — edge-safe (Web Crypto, no Node.js crypto)
   const token = await getToken({
     req,
@@ -20,17 +30,17 @@ export async function proxy(req: NextRequest) {
     return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
   }
 
-  // Admin routes: must be logged in + role=admin
+  // Admin routes: must be logged in + role=admin — send to /admin/login
   if (ADMIN_PATHS.some(p => pathname.startsWith(p))) {
     if (!token) {
-      return NextResponse.redirect(new URL('/login?callbackUrl=' + encodeURIComponent(pathname), req.url))
+      return NextResponse.redirect(new URL('/admin/login?callbackUrl=' + encodeURIComponent(pathname), req.url))
     }
     if (token.role !== 'admin') {
-      return NextResponse.redirect(new URL('/403', req.url))
+      return NextResponse.redirect(new URL('/', req.url))
     }
   }
 
-  // Protected customer routes: must be logged in
+  // Protected customer routes: must be logged in — send to /login
   if (PROTECTED_PATHS.some(p => pathname.startsWith(p))) {
     if (!token) {
       return NextResponse.redirect(new URL('/login?callbackUrl=' + encodeURIComponent(pathname), req.url))
@@ -42,7 +52,9 @@ export async function proxy(req: NextRequest) {
 
 export const config = {
   matcher: [
+    '/admin',
     '/admin/:path*',
+    '/admin/login',
     '/checkout/:path*',
     '/orders/:path*',
     '/account/:path*',
