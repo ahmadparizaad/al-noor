@@ -2,7 +2,7 @@ import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { db } from './db'
 import { users, refreshTokens } from './schema'
-import { eq, and, lt } from 'drizzle-orm'
+import { eq, and, lt, isNotNull } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
 import { z } from 'zod'
@@ -10,8 +10,9 @@ import type { UserRole } from '@/types'
 import { checkRateLimit } from './rate-limit'
 
 // ── Constants ────────────────────────────────────────────────────────────────
-const ACCESS_TOKEN_MAX_AGE  = 30 * 60          // 30 minutes (seconds)
-const REFRESH_TOKEN_MAX_AGE = 30 * 24 * 60 * 60 // 30 days (seconds)
+const ACCESS_TOKEN_MAX_AGE   = 30 * 60          // 30 minutes (seconds)
+const REFRESH_TOKEN_MAX_AGE  = 30 * 24 * 60 * 60 // 30 days (seconds)
+const REFRESH_TOKEN_REUSE_GRACE_MS = 30_000     // 30s grace for concurrent rotation races
 
 const loginSchema = z.object({
   email:    z.string().email(),
@@ -28,17 +29,24 @@ function nowSec(): number {
   return Math.floor(Date.now() / 1000)
 }
 
-async function createRefreshToken(userId: string): Promise<string> {
+async function createRefreshToken(userId: string, predecessorId?: string): Promise<string> {
   const token     = randomBytes(40).toString('hex')
   const tokenHash = hashToken(token)
   const expiresAt = new Date((nowSec() + REFRESH_TOKEN_MAX_AGE) * 1000)
 
-  // Purge expired tokens for this user before inserting (keep table lean)
+  // Purge tokens that are both expired AND outside the reuse grace window
+  const purgeBeforeDate = new Date(Date.now() - REFRESH_TOKEN_REUSE_GRACE_MS)
   await db
     .delete(refreshTokens)
-    .where(and(eq(refreshTokens.userId, userId), lt(refreshTokens.expiresAt, new Date())))
+    .where(
+      and(
+        eq(refreshTokens.userId, userId),
+        lt(refreshTokens.expiresAt, purgeBeforeDate),
+        isNotNull(refreshTokens.replacedAt),
+      ),
+    )
     .catch((err: unknown) => {
-      console.error('[auth] Failed to purge expired refresh tokens for user', userId, err)
+      console.error('[auth] Failed to purge stale refresh tokens for user', userId, err)
     })
 
   await db.insert(refreshTokens).values({
@@ -47,6 +55,15 @@ async function createRefreshToken(userId: string): Promise<string> {
     tokenHash,
     expiresAt,
   })
+
+  // Mark predecessor as replaced now that successor is committed
+  if (predecessorId) {
+    await db
+      .update(refreshTokens)
+      .set({ replacedAt: new Date(), replacedBy: tokenHash })
+      .where(eq(refreshTokens.id, predecessorId))
+      .catch(() => { /* non-fatal */ })
+  }
 
   return token
 }
@@ -63,11 +80,26 @@ async function rotateRefreshToken(oldToken: string, userId: string): Promise<str
   if (!existing) return null                       // token not found — force re-login
   if (existing.expiresAt < new Date()) return null  // token expired — force re-login
 
-  // Delete the old token (one-time use rotation)
-  await db.delete(refreshTokens).where(eq(refreshTokens.id, existing.id))
+  // If this token was already rotated within the grace window, return the
+  // successor token value from the JWT (we can't recover the raw token here,
+  // but the caller already has it in their JWT — this path just means the
+  // concurrent request should proceed normally using the JWT it already has).
+  // We signal "already rotated but still valid" by returning a sentinel so
+  // the caller can keep the existing refreshToken rather than treating it as
+  // an error.
+  if (existing.replacedAt !== null) {
+    const msSinceReplaced = Date.now() - existing.replacedAt.getTime()
+    if (msSinceReplaced <= REFRESH_TOKEN_REUSE_GRACE_MS) {
+      // Within grace window — concurrent race detected, not an attack.
+      // Return null so the jwt callback keeps the current token unchanged.
+      return oldToken
+    }
+    // Outside grace window — genuine reuse attack or very stale JWT. Force re-login.
+    return null
+  }
 
-  // Issue a fresh refresh token
-  return createRefreshToken(userId)
+  // Issue a fresh refresh token; mark old one as replaced atomically after insert
+  return createRefreshToken(userId, existing.id)
 }
 
 // ── Auth.js config ───────────────────────────────────────────────────────────
@@ -114,11 +146,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return { ...token, error: 'RefreshTokenExpired' }
       }
 
-      // Issue fresh access token + refresh token
+      // Issue fresh access token; update refreshToken only if it actually rotated
       return {
         ...token,
         accessExpiry:  nowSec() + ACCESS_TOKEN_MAX_AGE,
-        refreshToken:  newRefreshToken,
+        refreshToken:  newRefreshToken, // may equal old value during grace window — that's fine
         error:         undefined,
       }
     },

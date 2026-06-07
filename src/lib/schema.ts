@@ -16,6 +16,7 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+
 export const products = pgTable('products', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -65,12 +66,23 @@ export const addresses = pgTable('addresses', {
 ])
 
 export const refreshTokens = pgTable('refresh_tokens', {
-  id:        text('id').primaryKey(),
-  userId:    text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  tokenHash: text('token_hash').notNull().unique(),   // SHA-256 of the actual token
-  expiresAt: timestamp('expires_at').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+  id:          text('id').primaryKey(),
+  userId:      text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash:   text('token_hash').notNull().unique(),   // SHA-256 of the actual token
+  expiresAt:   timestamp('expires_at').notNull(),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+  replacedAt:  timestamp('replaced_at'),               // set when rotated; null = still active
+  replacedBy:  text('replaced_by'),                    // tokenHash of successor, for reuse grace
 }, t => [index('idx_refresh_tokens_user').on(t.userId)])
+
+export const catalogueOptions = pgTable('catalogue_options', {
+  id:        text('id').primaryKey(),
+  type:      text('type').notNull(),   // 'category' | 'material' | 'dial' | 'badge'
+  value:     text('value').notNull(),
+  sortOrder: integer('sort_order').default(0).notNull(),
+}, t => [
+  index('idx_catalogue_options_type').on(t.type),
+])
 
 export const orderItems = pgTable('order_items', {
   id: text('id').primaryKey(),
