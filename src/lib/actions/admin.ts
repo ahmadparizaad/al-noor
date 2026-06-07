@@ -1,0 +1,195 @@
+'use server'
+
+import { db } from '@/lib/db'
+import { products, orders, orderItems, users } from '@/lib/schema'
+import { eq, desc, asc, sql, sum, count, and, gte, lte } from 'drizzle-orm'
+import { auth } from '@/lib/auth'
+import { revalidatePath } from 'next/cache'
+import { AdminOrder, AdminCustomer, AdminProduct, RevenueMonth } from '@/types/admin'
+
+async function requireAdmin() {
+  const session = await auth()
+  if (!session?.user?.id || session.user.role !== 'admin') throw new Error('Unauthorized')
+}
+
+export async function getAdminOrders(): Promise<AdminOrder[]> {
+  await requireAdmin()
+
+  const rows = await db
+    .select({
+      id: orders.id,
+      status: orders.status,
+      totalInr: orders.totalInr,
+      paymentStatus: orders.paymentStatus,
+      trackingNumber: orders.trackingNumber,
+      shippingAddress: orders.shippingAddress,
+      createdAt: orders.createdAt,
+      customerName: users.name,
+      customerEmail: users.email,
+      customerPhone: users.phone,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.userId, users.id))
+    .orderBy(desc(orders.createdAt))
+
+  const orderIds = rows.map(r => r.id)
+  const itemRows = orderIds.length > 0
+    ? await db
+        .select({
+          orderId: orderItems.orderId,
+          productId: orderItems.productId,
+          quantity: orderItems.quantity,
+          priceInr: orderItems.priceInr,
+          productName: products.name,
+        })
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(sql`${orderItems.orderId} = ANY(ARRAY[${sql.raw(orderIds.map(id => `'${id}'`).join(','))}]::text[])`)
+    : []
+
+  const itemsByOrder = new Map<string, typeof itemRows>()
+  for (const item of itemRows) {
+    const list = itemsByOrder.get(item.orderId) ?? []
+    list.push(item)
+    itemsByOrder.set(item.orderId, list)
+  }
+
+  return rows.map(r => {
+    let addr: AdminOrder['shippingAddress']
+    try { addr = JSON.parse(r.shippingAddress) } catch { addr = { fullName: '', line1: '', city: '', state: '', pincode: '', phone: '' } }
+
+    return {
+      id: r.id,
+      customerName: r.customerName ?? 'Guest',
+      customerEmail: r.customerEmail ?? '',
+      customerPhone: r.customerPhone ?? undefined,
+      status: r.status,
+      totalInr: Number(r.totalInr),
+      paymentStatus: r.paymentStatus,
+      trackingNumber: r.trackingNumber ?? undefined,
+      shippingAddress: addr,
+      createdAt: r.createdAt.toISOString().split('T')[0],
+      items: (itemsByOrder.get(r.id) ?? []).map(i => ({
+        productId: i.productId,
+        productName: i.productName ?? 'Unknown Product',
+        quantity: i.quantity,
+        priceInr: Number(i.priceInr),
+      })),
+    }
+  })
+}
+
+export async function getAdminProducts(): Promise<AdminProduct[]> {
+  await requireAdmin()
+
+  const rows = await db
+    .select()
+    .from(products)
+    .orderBy(desc(products.createdAt))
+
+  return rows.map(p => {
+    let specs: Record<string, string> = {}
+    try { specs = JSON.parse(p.specs ?? '{}') } catch { /* empty */ }
+
+    return {
+      id: p.id,
+      name: p.name,
+      ref: specs.Reference ?? p.slug,
+      category: p.category,
+      material: specs.Material ?? '',
+      dial: specs['Dial Colour'] ?? '',
+      priceInr: Number(p.priceInr),
+      originalPriceInr: Number(p.originalPriceInr ?? p.priceInr),
+      stock: p.stock,
+      isActive: p.isActive,
+      badge: specs.Badge ?? '',
+    }
+  })
+}
+
+export async function getAdminCustomers(): Promise<AdminCustomer[]> {
+  await requireAdmin()
+
+  const customerOrders = await db
+    .select({
+      userId: orders.userId,
+      orderId: orders.id,
+      totalInr: orders.totalInr,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      customerName: users.name,
+      customerEmail: users.email,
+      customerPhone: users.phone,
+    })
+    .from(orders)
+    .leftJoin(users, eq(orders.userId, users.id))
+    .orderBy(desc(orders.createdAt))
+
+  const map = new Map<string, AdminCustomer>()
+
+  for (const row of customerOrders) {
+    const key = row.userId ?? row.customerEmail ?? 'guest'
+    if (!map.has(key)) {
+      map.set(key, {
+        id: key,
+        name: row.customerName ?? 'Guest',
+        email: row.customerEmail ?? '',
+        phone: row.customerPhone ?? undefined,
+        ordersCount: 0,
+        totalSpentInr: 0,
+        lastOrderDate: row.createdAt.toISOString().split('T')[0],
+        recentOrders: [],
+      })
+    }
+    const c = map.get(key)!
+    c.ordersCount += 1
+    c.totalSpentInr += Number(row.totalInr)
+    const dateStr = row.createdAt.toISOString().split('T')[0]
+    if (dateStr > c.lastOrderDate) c.lastOrderDate = dateStr
+    c.recentOrders.push({ id: row.orderId, totalInr: Number(row.totalInr), status: row.status, createdAt: dateStr })
+  }
+
+  return Array.from(map.values())
+}
+
+export async function getAdminRevenue(): Promise<RevenueMonth[]> {
+  await requireAdmin()
+
+  const rows = await db.execute(sql`
+    SELECT
+      TO_CHAR(created_at, 'Month') AS month,
+      DATE_TRUNC('month', created_at) AS month_start,
+      SUM(total_inr)::numeric AS revenue_inr,
+      COUNT(*) AS orders_count
+    FROM orders
+    WHERE payment_status = 'success'
+      AND created_at >= NOW() - INTERVAL '6 months'
+    GROUP BY month, month_start
+    ORDER BY month_start ASC
+  `)
+
+  return (rows as unknown as Array<{ month: string; revenue_inr: string; orders_count: string }>).map(r => ({
+    month: r.month.trim(),
+    revenueInr: Number(r.revenue_inr),
+    ordersCount: Number(r.orders_count),
+  }))
+}
+
+export async function updateOrderStatus(orderId: string, status: string) {
+  await requireAdmin()
+  await db.update(orders).set({ status: status as never, updatedAt: new Date() }).where(eq(orders.id, orderId))
+  revalidatePath('/admin/orders')
+  revalidatePath('/admin/dashboard')
+}
+
+export async function updateProductStock(productId: string, stock: number) {
+  await requireAdmin()
+  await db.update(products).set({ stock }).where(eq(products.id, productId))
+  revalidatePath('/admin/inventory')
+}
+
+export async function toggleProductActive(productId: string, isActive: boolean) {
+  await requireAdmin()
+  await db.update(products).set({ isActive }).where(eq(products.id, productId))
+  revalidatePath('/admin/inventory')
+}
