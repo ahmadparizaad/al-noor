@@ -1,26 +1,60 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* ── Al Noor brand tokens ── */
+  --color-ivory:        #FAF7F2;
+  --color-parchment:    #F0EBE2;
+  --color-parchment2:   #E8E0D4;
+  --color-deep:         #1A1410;
+  --color-mid:          #5C4F3A;
+  --color-muted-warm:   #8C7B65;
+  --color-light-warm:   #B8A99A;
+  --color-gold:         #9E7F4A;
+  --color-gold-dark:    #7A5C2E;
+  --color-gold-pale:    #EDD9B8;
+  --color-dark:         #0D0B09;
+  --color-dark-mid:     #1F1A14;
+  --color-success:      #27864A;
+  --color-danger:       #C0392B;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50%       { opacity: 1; }
+}
+@keyframes scrollX {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.animate-fade-up   { animation: fadeUp  1.1s cubic-bezier(.22,.68,0,1.2) both; }
+.animate-fade-up-d1{ animation: fadeUp  1.1s .1s  cubic-bezier(.22,.68,0,1.2) both; }
+.animate-fade-up-d2{ animation: fadeUp  1.1s .22s cubic-bezier(.22,.68,0,1.2) both; }
+.animate-fade-up-d3{ animation: fadeUp  1.1s .4s  cubic-bezier(.22,.68,0,1.2) both; }
+.animate-fade-in-d { animation: fadeIn  1.6s .3s  ease both; }
+.animate-shimmer   { animation: shimmer 2s   ease-in-out infinite; }
+.animate-ticker    { animation: scrollX 28s  linear infinite; }
+
+/* nav underline hover */
+.nav-link::after {
+  content: ''; display: block; height: 1px;
+  background: #9E7F4A;
+  transform: scaleX(0); transition: transform .2s; transform-origin: left;
 }
+.nav-link:hover::after { transform: scaleX(1); }
+
+/* product card watch zoom */
+.product-card .card-watch       { transition: transform .4s ease; }
+.product-card:hover .card-watch { transform: scale(1.06); }
+
+/* category tile watch tilt */
+.cat-tile .cat-watch            { transition: transform .5s ease; }
+.cat-tile:hover .cat-watch      { transform: scale(1.1) rotate(-3deg); }
