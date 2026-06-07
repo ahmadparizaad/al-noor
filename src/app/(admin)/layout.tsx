@@ -1,40 +1,34 @@
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import AdminSidebar from './AdminSidebar'
+import AdminProviders from './AdminProviders'
+import { getCatalogueOptions } from '@/lib/actions/catalogue'
+
+const T = { canvas: '#FAF7F2' }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
 
-  // Double-check server-side even though middleware guards this route
   if (!session?.user || session.user.role !== 'admin') {
-    redirect('/login')
+    redirect('/admin/login')
   }
 
+  const catalogue = await getCatalogueOptions()
+  const userName = session.user.name ?? session.user.email ?? 'Admin'
+
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      {/* Admin sidebar will go here */}
-      <aside className="w-64 bg-gray-900 text-white">
-        <div className="p-6 font-semibold tracking-widest text-xs uppercase text-gray-400">
-          Al Noor Admin
-        </div>
-        <nav className="px-4 space-y-1">
-          {[
-            { href: '/admin/dashboard', label: 'Dashboard' },
-            { href: '/admin/orders', label: 'Orders' },
-            { href: '/admin/inventory', label: 'Inventory' },
-            { href: '/admin/customers', label: 'Customers' },
-            { href: '/admin/analytics', label: 'Analytics' },
-          ].map(link => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="block px-3 py-2 rounded text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-      </aside>
-      <div className="flex-1 p-8">{children}</div>
-    </div>
+    <AdminProviders initial={{
+      categories: catalogue.category,
+      materials:  catalogue.material,
+      dialOptions: catalogue.dial,
+      badges:     catalogue.badge,
+    }}>
+      <div style={{ display: 'flex', minHeight: '100vh', background: T.canvas }}>
+        <AdminSidebar userName={userName} />
+        <main style={{ flex: 1, marginLeft: 220, padding: '32px', overflowY: 'auto', minWidth: 0 }}>
+          {children}
+        </main>
+      </div>
+    </AdminProviders>
   )
 }
