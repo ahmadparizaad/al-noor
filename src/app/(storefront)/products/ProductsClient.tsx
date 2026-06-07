@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { WatchFace } from '@/components/ui/WatchFace'
 import {
-  PRODUCTS, CATEGORIES, MATERIALS, DIAL_OPTIONS,
+  CATEGORIES, MATERIALS, DIAL_OPTIONS,
   formatPrice, discount,
   type Category, type Material, type DialColor, type Product,
 } from '@/lib/products-data'
@@ -37,7 +37,7 @@ const INITIAL_FILTERS: Filters = {
   priceMax: 130000,
 }
 
-export function ProductsClient() {
+export function ProductsClient({ products: allProducts }: { products: Product[] }) {
   const [search, setSearch]   = useState('')
   const [sort, setSort]       = useState<SortKey>('relevance')
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS)
@@ -112,7 +112,7 @@ export function ProductsClient() {
   }, [filters])
 
   const filtered = useMemo(() => {
-    let list: Product[] = [...PRODUCTS]
+    let list: Product[] = [...allProducts]
 
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -153,7 +153,7 @@ export function ProductsClient() {
 
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    PRODUCTS.forEach(p => { counts[p.category] = (counts[p.category] ?? 0) + 1 })
+    allProducts.forEach(p => { counts[p.category] = (counts[p.category] ?? 0) + 1 })
     return counts
   }, [])
 
@@ -238,7 +238,7 @@ export function ProductsClient() {
               </div>
             </div>
             <FilterGroup label="Category" open={openGroups.has('category')} onToggle={() => toggleGroup('category')}>
-              {CATEGORIES.map(cat => <FilterOption key={cat} label={cat} count={categoryCounts[cat] ?? 0} checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} />)}
+              {CATEGORIES.map(cat => <FilterOption key={`drawer-cat-${cat}`} label={cat} count={categoryCounts[cat] ?? 0} checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} />)}
             </FilterGroup>
             <FilterGroup label="Price" open={openGroups.has('price')} onToggle={() => toggleGroup('price')}>
               <div style={{ padding: '4px 0 10px' }}>
@@ -249,14 +249,14 @@ export function ProductsClient() {
               </div>
             </FilterGroup>
             <FilterGroup label="Case Material" open={openGroups.has('material')} onToggle={() => toggleGroup('material')}>
-              {MATERIALS.map(mat => <FilterOption key={mat} label={mat} checked={filters.materials.includes(mat)} onChange={() => toggleMaterial(mat)} />)}
+              {MATERIALS.map(mat => <FilterOption key={`drawer-mat-${mat}`} label={mat} checked={filters.materials.includes(mat)} onChange={() => toggleMaterial(mat)} />)}
             </FilterGroup>
             <FilterGroup label="Dial Colour" open={openGroups.has('dial')} onToggle={() => toggleGroup('dial')}>
-              {DIAL_OPTIONS.map(dial => <FilterOption key={dial} label={dial} checked={filters.dials.includes(dial)} onChange={() => toggleDial(dial)} />)}
+              {DIAL_OPTIONS.map(dial => <FilterOption key={`drawer-dial-${dial}`} label={dial} checked={filters.dials.includes(dial)} onChange={() => toggleDial(dial)} />)}
             </FilterGroup>
             <FilterGroup label="Rating" open={openGroups.has('rating')} onToggle={() => toggleGroup('rating')}>
               {[4, 3].map(r => (
-                <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer' }}>
+                <label key={`drawer-rating-${r}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer' }}>
                   <input type="radio" name="rating-drawer" checked={filters.minRating === r} onChange={() => setFilters(f => ({ ...f, minRating: f.minRating === r ? null : r }))} style={{ accentColor: '#9E7F4A', cursor: 'pointer' }} />
                   <StarRow count={r} /><span style={{ fontSize: 13, color: '#5C4F3A' }}>& above</span>
                 </label>
@@ -287,7 +287,7 @@ export function ProductsClient() {
           <FilterGroup label="Category" open={openGroups.has('category')} onToggle={() => toggleGroup('category')}>
             {CATEGORIES.map(cat => (
               <FilterOption
-                key={cat}
+                key={`sidebar-cat-${cat}`}
                 label={cat}
                 count={categoryCounts[cat] ?? 0}
                 checked={filters.categories.includes(cat)}
@@ -319,7 +319,7 @@ export function ProductsClient() {
           <FilterGroup label="Case Material" open={openGroups.has('material')} onToggle={() => toggleGroup('material')}>
             {MATERIALS.map(mat => (
               <FilterOption
-                key={mat}
+                key={`sidebar-mat-${mat}`}
                 label={mat}
                 checked={filters.materials.includes(mat)}
                 onChange={() => toggleMaterial(mat)}
@@ -331,7 +331,7 @@ export function ProductsClient() {
           <FilterGroup label="Dial Colour" open={openGroups.has('dial')} onToggle={() => toggleGroup('dial')}>
             {DIAL_OPTIONS.map(dial => (
               <FilterOption
-                key={dial}
+                key={`sidebar-dial-${dial}`}
                 label={dial}
                 checked={filters.dials.includes(dial)}
                 onChange={() => toggleDial(dial)}
@@ -342,7 +342,7 @@ export function ProductsClient() {
           {/* Rating */}
           <FilterGroup label="Rating" open={openGroups.has('rating')} onToggle={() => toggleGroup('rating')}>
             {[4, 3].map(r => (
-              <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer' }}>
+              <label key={`sidebar-rating-${r}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', cursor: 'pointer' }}>
                 <input
                   type="radio"
                   name="rating"
@@ -492,7 +492,7 @@ function ProductCard({ product: p, wished, onWish, onCart }: {
 
   return (
     <Link
-      href={`/product/${p.id}`}
+      href={`/product/${p.dbId ?? p.id}`}
       style={{
         background: '#fff',
         border: '1px solid rgba(158,127,74,0.10)',

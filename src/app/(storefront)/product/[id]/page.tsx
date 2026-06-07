@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { PRODUCTS, formatPrice, discount } from '@/lib/products-data'
+import { getProductById, getProductsAllIds, getAllProducts } from '@/lib/actions/products'
+import { toClientProduct } from '@/lib/product-mapper'
+import { formatPrice, discount } from '@/lib/products-data'
 import { PDPClient } from './PDPClient'
 
 interface Props {
@@ -9,21 +11,25 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params
-  const product = PRODUCTS.find(p => p.id === Number(id))
-  if (!product) return { title: 'Watch Not Found' }
+  const p = await getProductById(id)
+  if (!p) return { title: 'Watch Not Found' }
+  const client = toClientProduct(p, 0)
   return {
-    title: product.name,
-    description: `${product.category} · ${product.material} · ${product.dial} dial. ${formatPrice(product.price)} — ${discount(product.price, product.original)}% off.`,
+    title: p.name,
+    description: `${p.category} · ${client.material} · ${client.dial} dial. ${formatPrice(p.priceInr)} — ${discount(p.priceInr, p.originalPriceInr)}% off.`,
   }
 }
 
-export function generateStaticParams() {
-  return PRODUCTS.map(p => ({ id: String(p.id) }))
+export async function generateStaticParams() {
+  const ids = await getProductsAllIds()
+  return ids.map(id => ({ id }))
 }
 
 export default async function ProductPage({ params }: Props) {
   const { id } = await params
-  const product = PRODUCTS.find(p => p.id === Number(id))
-  if (!product) notFound()
-  return <PDPClient product={product} />
+  const [p, allDb] = await Promise.all([getProductById(id), getAllProducts()])
+  if (!p) notFound()
+  const clientProduct = toClientProduct(p, 0)
+  const allProducts = allDb.map((q, i) => toClientProduct(q, i))
+  return <PDPClient product={clientProduct} allProducts={allProducts} />
 }

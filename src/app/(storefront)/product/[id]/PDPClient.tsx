@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { WatchFace } from '@/components/ui/WatchFace'
-import { PRODUCTS, DIAL_OPTIONS, MATERIALS, formatPrice, discount, type Product, type DialColor, type Material } from '@/lib/products-data'
+import { DIAL_OPTIONS, MATERIALS, formatPrice, discount, type Product, type DialColor, type Material } from '@/lib/products-data'
 import { buildSpecs, REVIEWS } from '@/lib/pdp-data'
 import { useCart } from '@/lib/cart-store'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
@@ -29,7 +29,7 @@ const T = {
   red:         '#C0392B',
 }
 
-export function PDPClient({ product: initial }: { product: Product }) {
+export function PDPClient({ product: initial, allProducts = [] }: { product: Product; allProducts?: Product[] }) {
   const { isMobile, isTablet } = useBreakpoint()
   const [activeDial, setActiveDial]         = useState<DialColor>(initial.dial)
   const [activeMaterial, setActiveMaterial] = useState<Material>(initial.material)
@@ -62,10 +62,10 @@ export function PDPClient({ product: initial }: { product: Product }) {
   const specs = buildSpecs(p)
 
   // Related: same category, excluding self
-  const related = PRODUCTS
+  const related = allProducts
     .filter(q => q.id !== p.id && q.category === p.category)
     .slice(0, 5)
-  const relatedFinal = related.length >= 3 ? related : PRODUCTS.filter(q => q.id !== p.id).slice(0, 5)
+  const relatedFinal = related.length >= 3 ? related : allProducts.filter(q => q.id !== p.id).slice(0, 5)
 
   const ratingBars: [number, number][] = [[5, 0.72], [4, 0.18], [3, 0.06], [2, 0.02], [1, 0.02]]
 
@@ -379,7 +379,7 @@ export function PDPClient({ product: initial }: { product: Product }) {
         <Section title="Similar Timepieces" isMobile={isMobile}>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: 12 }}>
             {relatedFinal.map(q => (
-              <Link key={q.id} href={`/product/${q.id}`} style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, overflow: 'hidden', textDecoration: 'none', color: T.deep, display: 'block', transition: 'box-shadow 0.2s, transform 0.2s' }}>
+              <Link key={q.id} href={`/product/${q.dbId ?? q.id}`} style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, overflow: 'hidden', textDecoration: 'none', color: T.deep, display: 'block', transition: 'box-shadow 0.2s, transform 0.2s' }}>
                 <div style={{ aspectRatio: '1', background: T.parchment, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                   <WatchFace dial={q.dial} size={90} />
                 </div>
