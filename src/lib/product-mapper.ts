@@ -18,5 +18,6 @@ export function toClientProduct(p: StoreProduct, index: number): Product {
     badge: badge === 'new' ? 'New' : badge === 'sale' ? 'Sale' : '',
     badgeType: badge,
     delivery: 'Free delivery',
+    images: p.images,
   }
 }

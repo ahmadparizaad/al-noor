@@ -4,6 +4,8 @@ import { Fragment, useState } from 'react'
 import { AdminProduct } from '@/types/admin'
 import { formatPrice } from '@/lib/products-data'
 import { useCatalogue } from '@/lib/catalogue-context'
+import { ImageUploader } from '@/components/admin/ImageUploader'
+import type { UploadedImage } from '@/hooks/useImageUpload'
 
 interface InventoryClientProps {
   initialProducts: AdminProduct[]
@@ -43,6 +45,7 @@ interface ProductForm {
   stock: string
   badge: string
   isActive: boolean
+  images: UploadedImage[]
 }
 
 const EMPTY_FORM: ProductForm = {
@@ -56,6 +59,7 @@ const EMPTY_FORM: ProductForm = {
   stock: '1',
   badge: '',
   isActive: true,
+  images: [],
 }
 
 function productToForm(p: AdminProduct): ProductForm {
@@ -70,6 +74,7 @@ function productToForm(p: AdminProduct): ProductForm {
     stock: String(p.stock),
     badge: p.badge,
     isActive: p.isActive,
+    images: p.images.map(url => ({ publicId: url, url, width: 0, height: 0 })),
   }
 }
 
@@ -183,12 +188,13 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
       stock,
       badge: form.badge,
       isActive: form.isActive,
+      images: form.images.map(img => img.url),
     }
 
     if (panelMode === 'create') {
       setProducts(prev => [{ id: `PROD-${Date.now()}`, ...productData }, ...prev])
     } else if (editingProductId) {
-      setProducts(products.map(p => p.id === editingProductId ? { ...p, ...productData } : p))
+      setProducts(prev => prev.map(p => p.id === editingProductId ? { ...p, ...productData } : p))
     }
 
     closePanel()
@@ -279,6 +285,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
         <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: DATA, fontSize: '13px' }}>
           <thead>
             <tr style={{ background: T.cardAlt, borderBottom: `1px solid ${T.border}` }}>
+              <th style={{ padding: '12px 16px', textAlign: 'center', color: T.muted, fontWeight: 500, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase', width: '60px' }}>Photo</th>
               <th style={{ padding: '12px 16px', textAlign: 'left', color: T.muted, fontWeight: 500, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Watch</th>
               <th style={{ padding: '12px 16px', textAlign: 'left', color: T.muted, fontWeight: 500, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Ref</th>
               <th style={{ padding: '12px 16px', textAlign: 'left', color: T.muted, fontWeight: 500, fontSize: '11px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Category</th>
@@ -298,6 +305,18 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     borderBottom: (deleteConfirmId === product.id || statusConfirm === product.id) ? 'none' : `1px solid ${T.border}`,
                   }}
                 >
+                  <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                    {product.images?.[0] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '3px', border: `1px solid ${T.border}` }}
+                      />
+                    ) : (
+                      <div style={{ width: '40px', height: '40px', background: T.cardAlt, borderRadius: '3px', border: `1px solid ${T.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📷</div>
+                    )}
+                  </td>
                   <td style={{ padding: '12px 16px', color: T.deep, fontWeight: 500 }}>
                     {product.name}
                     {product.badge && (
@@ -391,7 +410,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 {/* Status toggle confirmation */}
                 {statusConfirm === product.id && (
                   <tr key={`${product.id}-status`} style={{ background: product.isActive ? 'rgba(192,57,43,0.04)' : 'rgba(39,134,74,0.04)', borderBottom: `1px solid ${T.border}` }}>
-                    <td colSpan={8} style={{ padding: '12px 16px' }}>
+                    <td colSpan={9} style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <span style={{ fontFamily: DATA, fontSize: '13px', color: product.isActive ? T.red : T.green, fontWeight: 500 }}>
                           {product.isActive
@@ -428,7 +447,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                 {/* Delete confirmation */}
                 {deleteConfirmId === product.id && (
                   <tr key={`${product.id}-delete`} style={{ background: 'rgba(192,57,43,0.04)', borderBottom: `1px solid ${T.border}` }}>
-                    <td colSpan={8} style={{ padding: '12px 16px' }}>
+                    <td colSpan={9} style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <span style={{ fontFamily: DATA, fontSize: '13px', color: T.red, fontWeight: 500 }}>
                           Delete "{product.name}"? This cannot be undone.
@@ -532,6 +551,14 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
             <div style={{ marginTop: '6px', fontSize: '11px', color: T.muted, fontFamily: DATA }}>
               Controls the live dial preview on the product detail page.
             </div>
+          </div>
+
+          <div>
+            <Label>Product Images</Label>
+            <ImageUploader
+              images={form.images}
+              onChange={imgs => setField('images', imgs)}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>

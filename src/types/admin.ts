@@ -52,6 +52,7 @@ export interface AdminProduct {
   stock: number
   isActive: boolean
   badge: string
+  images: string[]
 }
 
 export interface RevenueMonth {

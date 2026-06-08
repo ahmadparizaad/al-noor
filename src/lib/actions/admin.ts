@@ -103,6 +103,7 @@ export async function getAdminProducts(): Promise<AdminProduct[]> {
       stock: p.stock,
       isActive: p.isActive,
       badge: specs.Badge ?? '',
+      images: p.images ?? [],
     }
   })
 }

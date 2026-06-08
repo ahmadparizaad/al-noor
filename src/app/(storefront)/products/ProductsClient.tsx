@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { WatchFace } from '@/components/ui/WatchFace'
 import {
   CATEGORIES, MATERIALS, DIAL_OPTIONS,
@@ -530,8 +531,20 @@ function ProductCard({ product: p, wished, onWish, onCart }: {
       </button>
 
       {/* Image */}
-      <div style={{ width: '100%', aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F0EBE2', padding: 24, position: 'relative' }}>
-        <WatchFace dial={p.dial} size={140} />
+      <div style={{ width: '100%', aspectRatio: '1', background: '#F0EBE2', position: 'relative', overflow: 'hidden' }}>
+        {p.images?.[0] ? (
+          <Image
+            src={p.images[0]}
+            alt={p.name}
+            fill
+            style={{ objectFit: 'cover' }}
+            sizes="(max-width: 600px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+            <WatchFace dial={p.dial} size={140} />
+          </div>
+        )}
       </div>
 
       {/* Body */}

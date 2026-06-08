@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { WatchFace } from '@/components/ui/WatchFace'
@@ -33,6 +34,8 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
   const { isMobile, isTablet } = useBreakpoint()
   const [activeDial, setActiveDial]         = useState<DialColor>(initial.dial)
   const [activeMaterial, setActiveMaterial] = useState<Material>(initial.material)
+  const [activeImageIdx, setActiveImageIdx] = useState(0)
+  const hasImages = (initial.images?.length ?? 0) > 0
   const [qty, setQty]                       = useState(1)
   const [wished, setWished]                 = useState(false)
   const [cartAdded, setCartAdded]           = useState(false)
@@ -114,26 +117,51 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
           {/* ── Image column ── */}
           <div style={{ position: isMobile ? 'static' : 'sticky', top: 80, padding: isMobile ? '16px 16px 0' : 0 }}>
             {/* Main image */}
-            <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, position: 'relative' }}>
-              <WatchFace dial={activeDial} size={280} />
-              <div style={{ position: 'absolute', bottom: 12, right: 12, fontSize: 10, color: T.muted, letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
-                Live dial
-              </div>
+            <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: hasImages ? 0 : 32, position: 'relative', overflow: 'hidden' }}>
+              {hasImages ? (
+                <Image
+                  src={initial.images![activeImageIdx]}
+                  alt={`${initial.name} — image ${activeImageIdx + 1}`}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  sizes="(max-width: 768px) 100vw, 380px"
+                  priority={activeImageIdx === 0}
+                />
+              ) : (
+                <>
+                  <WatchFace dial={activeDial} size={280} />
+                  <div style={{ position: 'absolute', bottom: 12, right: 12, fontSize: 10, color: T.muted, letterSpacing: '0.06em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>
+                    Live dial
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Thumbnails — dial colour switcher */}
+            {/* Thumbnails */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              {DIAL_OPTIONS.map(dial => (
-                <button
-                  key={dial}
-                  onClick={() => setActiveDial(dial)}
-                  title={dial}
-                  style={{ width: 64, height: 64, background: T.white, border: `2px solid ${activeDial === dial ? T.gold : T.borderLight}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 6, transition: 'border-color 0.2s' }}
-                >
-                  <WatchFace dial={dial} size={50} />
-                </button>
-              ))}
+              {hasImages ? (
+                initial.images!.map((url, idx) => (
+                  <button
+                    key={url}
+                    onClick={() => setActiveImageIdx(idx)}
+                    style={{ width: 64, height: 64, background: T.white, border: `2px solid ${activeImageIdx === idx ? T.gold : T.borderLight}`, borderRadius: 2, cursor: 'pointer', padding: 0, overflow: 'hidden', position: 'relative', flexShrink: 0 }}
+                  >
+                    <Image src={url} alt={`Thumbnail ${idx + 1}`} fill style={{ objectFit: 'cover' }} sizes="64px" />
+                  </button>
+                ))
+              ) : (
+                DIAL_OPTIONS.map(dial => (
+                  <button
+                    key={dial}
+                    onClick={() => setActiveDial(dial)}
+                    title={dial}
+                    style={{ width: 64, height: 64, background: T.white, border: `2px solid ${activeDial === dial ? T.gold : T.borderLight}`, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 6, transition: 'border-color 0.2s' }}
+                  >
+                    <WatchFace dial={dial} size={50} />
+                  </button>
+                ))
+              )}
             </div>
 
             {/* Actions row */}
@@ -380,8 +408,14 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : isTablet ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: 12 }}>
             {relatedFinal.map(q => (
               <Link key={q.id} href={`/product/${q.dbId ?? q.id}`} style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, overflow: 'hidden', textDecoration: 'none', color: T.deep, display: 'block', transition: 'box-shadow 0.2s, transform 0.2s' }}>
-                <div style={{ aspectRatio: '1', background: T.parchment, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-                  <WatchFace dial={q.dial} size={90} />
+                <div style={{ aspectRatio: '1', background: T.parchment, position: 'relative', overflow: 'hidden' }}>
+                  {q.images?.[0] ? (
+                    <Image src={q.images[0]} alt={q.name} fill style={{ objectFit: 'cover' }} sizes="200px" />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                      <WatchFace dial={q.dial} size={90} />
+                    </div>
+                  )}
                 </div>
                 <div style={{ padding: '10px 12px 12px' }}>
                   <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 13, color: T.deep, marginBottom: 4, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{q.name}</div>

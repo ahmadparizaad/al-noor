@@ -18,6 +18,7 @@ export interface Product {
   badge: string
   badgeType: BadgeType
   delivery: string
+  images?: string[]
 }
 
 export const DIAL_COLORS: Record<DialColor, { bg1: string; bg2: string; accent: string; marks: string }> = {
