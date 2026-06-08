@@ -26,10 +26,10 @@ const raleway = Raleway({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Al Noor — Luxury Horology',
-    template: '%s — Al Noor',
+    default: 'Al Noor | Luxury Watches',
+    template: '%s | Al Noor',
   },
-  description: 'Exceptional timepieces crafted in Geneva. Al Noor luxury watches — where precision meets artistry.',
+  description: 'Premium luxury watches at honest prices. Al Noor, 100% original timepieces with fast insured delivery.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

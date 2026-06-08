@@ -23,7 +23,7 @@ const CATEGORIES: { label: string; sub: string; dial: DialColor; count: number }
 ]
 
 const PILLARS = [
-  { num: '01', title: '100% Original',    body: 'Every watch we sell is genuine — sourced directly, verified before it reaches you.' },
+  { num: '01', title: '100% Original',    body: 'Every watch we sell is genuine, sourced directly, verified before it reaches you.' },
   { num: '02', title: 'Best Price',       body: 'Up to 45% off on all watches. No hidden costs, no compromise on authenticity.' },
   { num: '03', title: 'Insured Delivery', body: 'Fast shipping with full insurance, discreet packaging, and signature on arrival.' },
   { num: '04', title: 'Easy Returns',     body: '30 days, no questions. We believe a watch must feel right on your wrist.' },
@@ -31,7 +31,7 @@ const PILLARS = [
 
 const TESTIMONIALS = [
   { name: 'Arjun M.',   city: 'Mumbai',    text: "Got my watch at almost half the price I'd seen elsewhere. 100% genuine, delivered fast. Al Noor is my go-to now.",                              stars: 5, product: 'Verified Buyer' },
-  { name: 'Fatima R.',  city: 'Hyderabad', text: 'I was skeptical ordering a luxury watch online. Al Noor changed that — from the call confirmation to unboxing, everything was perfect.',       stars: 5, product: 'Verified Buyer' },
+  { name: 'Fatima R.',  city: 'Hyderabad', text: 'I was skeptical ordering a luxury watch online. Al Noor changed that. From the call confirmation to unboxing, everything was perfect.',       stars: 5, product: 'Verified Buyer' },
   { name: 'Vikram S.',  city: 'Delhi',     text: 'Best prices I found anywhere in India. The watch arrived in pristine condition, exactly as shown. Highly recommend.',                           stars: 5, product: 'Verified Buyer' },
 ]
 
@@ -177,16 +177,13 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
       >
         {/* Background glow */}
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 70% 50%, rgba(158,127,74,0.08) 0%, transparent 60%), radial-gradient(circle at 20% 80%, rgba(158,127,74,0.05) 0%, transparent 50%)' }} />
-        {/* Decorative lines */}
-        <div className="absolute top-[15%] left-[5%] w-px h-[35%]" style={{ background: 'linear-gradient(to bottom, transparent, rgba(158,127,74,0.3), transparent)' }} />
-        <div className="absolute top-[20%] right-[5%] w-px h-[25%]" style={{ background: 'linear-gradient(to bottom, transparent, rgba(158,127,74,0.2), transparent)' }} />
 
         <div className="w-full max-w-350 mx-auto px-5 md:px-8 py-12 md:py-16 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
 
           {/* Left: text */}
           <div>
             <div className="animate-fade-up text-[28px] opacity-90 mb-5 text-gold tracking-[0.08em]" style={{ fontFamily: ARABIC }}>
-              النور — ضوء لا ينطفئ
+              النور · ضوء لا ينطفئ
             </div>
 
             <h1 className="animate-fade-up text-ivory font-bold italic leading-[1.05] m-0 mb-2 tracking-[-0.01em] text-[clamp(2.8rem,6vw,5.5rem)]" style={{ fontFamily: DISPLAY }}>
@@ -197,7 +194,7 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
             </h1>
 
             <p className="animate-fade-up-d2 italic text-ivory/72 leading-[1.75] max-w-110 mb-12 text-[clamp(1rem,1.6vw,1.25rem)]" style={{ fontFamily: BODY }}>
-              Premium timepieces at honest prices — walk into our store or order online.
+              Premium timepieces at honest prices. Walk into our store or order online.
               Every watch 100% original, every sale backed by our guarantee.
             </p>
 
@@ -322,11 +319,11 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
               Born from the<br />Arabic word for Light
             </h2>
             <p className="text-ivory/65 text-[18px] leading-[1.85] mb-5" style={{ fontFamily: BODY }}>
-              Al Noor — النور — means the light. It is both a name and a philosophy.
+              Al Noor, النور, means the light. It is both a name and a philosophy.
               Every watch we carry reflects this idea: that time, truly measured, illuminates life.
             </p>
             <p className="text-ivory/50 text-[18px] italic leading-[1.85] mb-10" style={{ fontFamily: BODY }}>
-              We bring premium timepieces to discerning buyers — each piece genuine,
+              We bring premium timepieces to discerning buyers: each piece genuine,
               each price honest, each delivery protected.
             </p>
             <Link href="/products" className="inline-flex items-center gap-2 text-gold no-underline text-[11px] font-bold tracking-[0.18em] uppercase border-b border-gold pb-1" style={{ fontFamily: UI }}>

@@ -155,7 +155,7 @@ export function ProfileClient() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: `0 ${isMobile ? 16 : 24}px`, height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, letterSpacing: '0.35em', color: T.gold, textDecoration: 'none' }}>
             AL NOOR
-            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Horology · Geneva</span>}
+            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Luxury Watches</span>}
           </Link>
           <nav style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 16 : 24 }}>
             {!isMobile && <Link href="/products" style={{ fontSize: 13, color: T.mid, textDecoration: 'none', fontWeight: 500 }}>All Watches</Link>}

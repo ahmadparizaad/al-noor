@@ -4,8 +4,8 @@ import { getFeaturedProducts } from '@/lib/actions/products'
 import { toClientProduct } from '@/lib/product-mapper'
 
 export const metadata: Metadata = {
-  title: 'Al Noor — Luxury Horology · Geneva',
-  description: 'Exceptional timepieces born in Geneva. Al Noor watches — where Swiss precision meets the poetry of Arabic light.',
+  title: 'Al Noor | Luxury Watches',
+  description: 'Exceptional timepieces born in Geneva. Al Noor watches, where Swiss precision meets the poetry of Arabic light.',
 }
 
 export default async function HomePage() {

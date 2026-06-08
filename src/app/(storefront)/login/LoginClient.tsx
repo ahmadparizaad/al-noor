@@ -132,7 +132,7 @@ function LoginInner() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: `0 ${isMobile ? 16 : 24}px`, height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, letterSpacing: '0.35em', color: T.gold, textDecoration: 'none' }}>
             AL NOOR
-            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Horology · Geneva</span>}
+            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Luxury Watches</span>}
           </Link>
           <Link href="/products" style={{ fontSize: 13, color: T.mid, textDecoration: 'none', fontWeight: 500 }}>Browse Watches</Link>
         </div>
@@ -148,7 +148,7 @@ function LoginInner() {
             {/* Logo + heading */}
             <div style={{ textAlign: 'center', padding: isMobile ? '24px 24px 20px' : '36px 40px 28px', borderBottom: `1px solid ${T.borderLight}`, background: T.ivory }}>
               <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '0.35em', color: T.gold, marginBottom: 2 }}>AL NOOR</div>
-              <div style={{ fontSize: 10, letterSpacing: '0.2em', color: T.muted, marginBottom: 20 }}>HOROLOGY · GENEVA</div>
+              <div style={{ fontSize: 10, letterSpacing: '0.2em', color: T.muted, marginBottom: 20 }}>LUXURY WATCHES</div>
               <h1 style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 22, fontStyle: 'italic', color: T.deep, margin: 0 }}>
                 {mode === 'login' ? 'Welcome Back' : 'Create Account'}
               </h1>

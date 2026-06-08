@@ -290,7 +290,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', gap: 24 }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: 15, letterSpacing: '0.35em', color: '#9E7F4A', whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'none' }}>
             AL NOOR
-            <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#8C7B65', fontWeight: 400, marginTop: 1 }}>Horology · Geneva</span>
+            <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#8C7B65', fontWeight: 400, marginTop: 1 }}>Luxury Watches</span>
           </Link>
           <nav style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 28 }}>
             <Link href="/products" style={{ fontSize: 13, fontWeight: 500, color: '#5C4F3A', textDecoration: 'none' }}>All Watches</Link>

@@ -155,7 +155,7 @@ export function AccountClient() {
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: 15, letterSpacing: '0.35em', color: T.gold, textDecoration: 'none' }}>
             AL NOOR
-            <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Horology · Geneva</span>
+            <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: T.muted, fontWeight: 400, marginTop: 1 }}>Luxury Watches</span>
           </Link>
           <nav style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
             <Link href="/products" style={{ fontSize: 13, color: T.mid, textDecoration: 'none', fontWeight: 500 }}>All Watches</Link>

@@ -165,7 +165,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, letterSpacing: '0.35em', color: '#9E7F4A', whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'none' }}>
             AL NOOR
-            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#8C7B65', fontWeight: 400, marginTop: 1 }}>Horology · Geneva</span>}
+            {!isMobile && <span style={{ display: 'block', fontSize: 9, letterSpacing: '0.15em', color: '#8C7B65', fontWeight: 400, marginTop: 1 }}>Luxury Watches</span>}
           </Link>
 
           {/* Search */}
