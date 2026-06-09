@@ -26,12 +26,12 @@ async function getSignature(paramsToSign: Record<string, string>): Promise<SignR
 }
 
 export function useImageUpload(folder = 'al-noor/products') {
-  const [uploading, setUploading] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
+  const [uploadCount, setUploadCount] = useState(0)
+  const [error, setError]             = useState<string | null>(null)
 
   const upload = useCallback(async (file: File): Promise<UploadedImage | null> => {
     setError(null)
-    setUploading(true)
+    setUploadCount(c => c + 1)
     try {
       const timestamp = String(Math.round(Date.now() / 1000))
       const paramsToSign: Record<string, string> = { folder, timestamp }
@@ -56,18 +56,25 @@ export function useImageUpload(folder = 'al-noor/products') {
       setError(err instanceof Error ? err.message : 'Upload failed')
       return null
     } finally {
-      setUploading(false)
+      setUploadCount(c => c - 1)
     }
   }, [folder])
 
   const deleteImage = useCallback(async (publicId: string): Promise<boolean> => {
-    const res = await fetch('/api/upload/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ publicId }),
-    })
-    return res.ok
+    setError(null)
+    try {
+      const res = await fetch('/api/upload/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicId }),
+      })
+      if (!res.ok) throw new Error('Failed to delete image')
+      return true
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delete failed')
+      return false
+    }
   }, [])
 
-  return { upload, deleteImage, uploading, error }
+  return { upload, deleteImage, uploading: uploadCount > 0, error }
 }

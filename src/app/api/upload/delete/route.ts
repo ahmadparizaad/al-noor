@@ -9,7 +9,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { publicId } = await req.json() as { publicId: string }
-  if (!publicId) return NextResponse.json({ error: 'publicId required' }, { status: 400 })
+  if (!publicId || !publicId.startsWith('al-noor/')) {
+    return NextResponse.json({ error: 'Invalid publicId' }, { status: 400 })
+  }
 
   const result = await cloudinary.uploader.destroy(publicId)
   return NextResponse.json({ result })

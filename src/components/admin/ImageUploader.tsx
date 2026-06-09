@@ -37,17 +37,13 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
   const processFiles = useCallback(async (files: FileList) => {
     const remaining = maxImages - images.length
     if (remaining <= 0) return
-    const toUpload = Array.from(files).slice(0, remaining)
+    const toUpload = Array.from(files)
+      .filter(f => f.type.startsWith('image/') && f.size <= MAX_SIZE_MB * 1024 * 1024)
+      .slice(0, remaining)
 
-    for (const file of toUpload) {
-      if (!file.type.startsWith('image/')) continue
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) continue
-
-      const result = await upload(file)
-      if (result) {
-        onChange([...images, result])
-      }
-    }
+    const results = await Promise.all(toUpload.map(f => upload(f)))
+    const successful = results.filter((r): r is UploadedImage => r !== null)
+    if (successful.length > 0) onChange([...images, ...successful])
   }, [images, maxImages, upload, onChange])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -58,8 +54,8 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
 
   const handleDelete = useCallback(async (img: UploadedImage) => {
     setDeletingId(img.publicId)
-    await deleteImage(img.publicId)
-    onChange(images.filter(i => i.publicId !== img.publicId))
+    const ok = await deleteImage(img.publicId)
+    if (ok) onChange(images.filter(i => i.publicId !== img.publicId))
     setDeletingId(null)
   }, [images, deleteImage, onChange])
 
@@ -112,7 +108,9 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
             <span style={{ fontSize: '13px', color: T.gold }}>Uploading…</span>
           ) : (
             <>
-              <div style={{ fontSize: '22px', marginBottom: '8px', color: T.light }}>📷</div>
+              <div style={{ marginBottom: '8px', color: T.light, display: 'flex', justifyContent: 'center' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
               <div style={{ fontSize: '13px', color: T.muted, lineHeight: 1.5 }}>
                 Drop images here or <span style={{ color: T.gold, fontWeight: 600 }}>click to browse</span>
               </div>
@@ -155,6 +153,7 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
               <img
                 src={img.url}
                 alt={`Product image ${idx + 1}`}
+                loading="lazy"
                 style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', display: 'block' }}
               />
 
@@ -172,12 +171,14 @@ export function ImageUploader({ images, onChange, maxImages = 8 }: ImageUploader
                     onClick={() => handleMoveLeft(idx)}
                     disabled={idx === 0}
                     title="Move left"
+                    aria-label="Move image left"
                     style={{ padding: '3px 8px', fontSize: '12px', background: idx === 0 ? 'rgba(255,255,255,0.2)' : T.card, color: T.deep, border: 'none', borderRadius: '2px', cursor: idx === 0 ? 'default' : 'pointer' }}
                   >←</button>
                   <button
                     onClick={() => handleMoveRight(idx)}
                     disabled={idx === images.length - 1}
                     title="Move right"
+                    aria-label="Move image right"
                     style={{ padding: '3px 8px', fontSize: '12px', background: idx === images.length - 1 ? 'rgba(255,255,255,0.2)' : T.card, color: T.deep, border: 'none', borderRadius: '2px', cursor: idx === images.length - 1 ? 'default' : 'pointer' }}
                   >→</button>
                 </div>

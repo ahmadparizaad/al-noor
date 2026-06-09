@@ -7,6 +7,12 @@ import { useCatalogue } from '@/lib/catalogue-context'
 import { ImageUploader } from '@/components/admin/ImageUploader'
 import type { UploadedImage } from '@/hooks/useImageUpload'
 
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
+function toCloudinaryUrl(publicId: string): string {
+  if (publicId.startsWith('http')) return publicId
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto,w_80/${publicId}`
+}
+
 interface InventoryClientProps {
   initialProducts: AdminProduct[]
 }
@@ -74,7 +80,11 @@ function productToForm(p: AdminProduct): ProductForm {
     stock: String(p.stock),
     badge: p.badge,
     isActive: p.isActive,
-    images: p.images.map(url => ({ publicId: url, url, width: 0, height: 0 })),
+    images: p.images.map(url => {
+      const match = url.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/)
+      const publicId = match?.[1] ?? url
+      return { publicId, url, width: 0, height: 0 }
+    }),
   }
 }
 
@@ -188,7 +198,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
       stock,
       badge: form.badge,
       isActive: form.isActive,
-      images: form.images.map(img => img.url),
+      images: form.images.map(img => img.publicId),
     }
 
     if (panelMode === 'create') {
@@ -309,12 +319,15 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     {product.images?.[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={product.images[0]}
+                        src={toCloudinaryUrl(product.images[0])}
                         alt={product.name}
+                        loading="lazy"
                         style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '3px', border: `1px solid ${T.border}` }}
                       />
                     ) : (
-                      <div style={{ width: '40px', height: '40px', background: T.cardAlt, borderRadius: '3px', border: `1px solid ${T.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📷</div>
+                      <div style={{ width: '40px', height: '40px', background: T.cardAlt, borderRadius: '3px', border: `1px solid ${T.border}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: T.muted }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      </div>
                     )}
                   </td>
                   <td style={{ padding: '12px 16px', color: T.deep, fontWeight: 500 }}>

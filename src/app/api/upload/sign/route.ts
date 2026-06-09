@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
   }
 
   const { paramsToSign } = await req.json() as { paramsToSign: Record<string, string> }
-  const signature = cloudinary.utils.api_sign_request(paramsToSign, process.env.CLOUDINARY_API_SECRET!)
+  const ALLOWED_KEYS = new Set(['folder', 'timestamp'])
+  const safe: Record<string, string> = Object.fromEntries(
+    Object.entries(paramsToSign).filter(([k]) => ALLOWED_KEYS.has(k))
+  )
+  safe.folder = 'al-noor/products'
+  const signature = cloudinary.utils.api_sign_request(safe, process.env.CLOUDINARY_API_SECRET!)
 
   return NextResponse.json({
     signature,
