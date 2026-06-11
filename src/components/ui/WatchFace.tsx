@@ -46,11 +46,12 @@ export function WatchFace({ dial, size = 140 }: WatchFaceProps) {
     const isMain = i % 3 === 0
     const outer = r * 0.87
     const inner = isMain ? r * 0.74 : r * 0.80
+    const round6 = (n: number) => Math.round(n * 1e6) / 1e6
     return {
-      x1: cx + outer * Math.cos(rad),
-      y1: cy + outer * Math.sin(rad),
-      x2: cx + inner * Math.cos(rad),
-      y2: cy + inner * Math.sin(rad),
+      x1: round6(cx + outer * Math.cos(rad)),
+      y1: round6(cy + outer * Math.sin(rad)),
+      x2: round6(cx + inner * Math.cos(rad)),
+      y2: round6(cy + inner * Math.sin(rad)),
       isMain,
     }
   })

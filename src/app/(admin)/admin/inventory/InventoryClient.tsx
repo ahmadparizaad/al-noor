@@ -6,6 +6,7 @@ import { formatPrice } from '@/lib/products-data'
 import { useCatalogue } from '@/lib/catalogue-context'
 import { ImageUploader } from '@/components/admin/ImageUploader'
 import type { UploadedImage } from '@/hooks/useImageUpload'
+import { createProduct, updateProduct, deleteProduct, toggleProductActive, updateProductStock } from '@/lib/actions/admin'
 
 const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
 function toCloudinaryUrl(publicId: string): string {
@@ -118,10 +119,11 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     setStockInput(String(currentStock))
   }
 
-  const handleStockSave = (id: string) => {
+  const handleStockSave = async (id: string) => {
     const newStock = parseInt(stockInput, 10)
     if (!isNaN(newStock) && newStock >= 0) {
       setProducts(products.map(p => (p.id === id ? { ...p, stock: newStock } : p)))
+      await updateProductStock(id, newStock)
     }
     setEditingStockId(null)
     setStockInput('')
@@ -133,15 +135,20 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     setStatusConfirm(statusConfirm === id ? null : id)
   }
 
-  const handleToggleActive = (id: string) => {
-    setProducts(products.map(p => (p.id === id ? { ...p, isActive: !p.isActive } : p)))
+  const handleToggleActive = async (id: string) => {
+    const product = products.find(p => p.id === id)
+    if (!product) return
+    const newActive = !product.isActive
+    setProducts(products.map(p => (p.id === id ? { ...p, isActive: newActive } : p)))
     setStatusConfirm(null)
+    await toggleProductActive(id, newActive)
   }
 
   // --- Delete ---
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     setProducts(products.filter(p => p.id !== id))
     setDeleteConfirmId(null)
+    await deleteProduct(id)
   }
 
   // --- Panel open/close ---
@@ -176,7 +183,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   }
 
   // --- Validation & save ---
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.name.trim()) { setFormError('Watch name is required.'); return }
     if (!form.ref.trim()) { setFormError('Reference number is required.'); return }
     const price = parseInt(form.priceInr, 10)
@@ -202,8 +209,10 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     }
 
     if (panelMode === 'create') {
-      setProducts(prev => [{ id: `PROD-${Date.now()}`, ...productData }, ...prev])
+      const { id } = await createProduct(productData)
+      setProducts(prev => [{ id, ...productData }, ...prev])
     } else if (editingProductId) {
+      await updateProduct(editingProductId, productData)
       setProducts(prev => prev.map(p => p.id === editingProductId ? { ...p, ...productData } : p))
     }
 

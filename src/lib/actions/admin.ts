@@ -194,3 +194,76 @@ export async function toggleProductActive(productId: string, isActive: boolean) 
   await db.update(products).set({ isActive }).where(eq(products.id, productId))
   revalidatePath('/admin/inventory')
 }
+
+interface ProductPayload {
+  name: string
+  ref: string
+  category: string
+  material: string
+  dial: string
+  priceInr: number
+  originalPriceInr: number
+  stock: number
+  badge: string
+  isActive: boolean
+  images: string[]
+}
+
+function buildSlug(name: string, id: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + id.slice(-6)
+}
+
+export async function createProduct(payload: ProductPayload): Promise<{ id: string }> {
+  await requireAdmin()
+  const id = `PROD-${Date.now()}`
+  const specs = JSON.stringify({
+    Reference: payload.ref,
+    Material: payload.material,
+    'Dial Colour': payload.dial,
+    ...(payload.badge ? { Badge: payload.badge } : {}),
+  })
+  await db.insert(products).values({
+    id,
+    name: payload.name,
+    slug: buildSlug(payload.name, id),
+    category: payload.category,
+    priceInr: String(payload.priceInr),
+    originalPriceInr: String(payload.originalPriceInr),
+    stock: payload.stock,
+    images: payload.images,
+    specs,
+    isActive: payload.isActive,
+  })
+  revalidatePath('/admin/inventory')
+  revalidatePath('/products')
+  return { id }
+}
+
+export async function updateProduct(productId: string, payload: ProductPayload): Promise<void> {
+  await requireAdmin()
+  const specs = JSON.stringify({
+    Reference: payload.ref,
+    Material: payload.material,
+    'Dial Colour': payload.dial,
+    ...(payload.badge ? { Badge: payload.badge } : {}),
+  })
+  await db.update(products).set({
+    name: payload.name,
+    category: payload.category,
+    priceInr: String(payload.priceInr),
+    originalPriceInr: String(payload.originalPriceInr),
+    stock: payload.stock,
+    images: payload.images,
+    specs,
+    isActive: payload.isActive,
+  }).where(eq(products.id, productId))
+  revalidatePath('/admin/inventory')
+  revalidatePath('/products')
+}
+
+export async function deleteProduct(productId: string): Promise<void> {
+  await requireAdmin()
+  await db.delete(products).where(eq(products.id, productId))
+  revalidatePath('/admin/inventory')
+  revalidatePath('/products')
+}

@@ -10,6 +10,12 @@ import { buildSpecs, REVIEWS } from '@/lib/pdp-data'
 import { useCart } from '@/lib/cart-store'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
 
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
+function toImageUrl(src: string): string {
+  if (src.startsWith('http')) return src
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto/${src}`
+}
+
 const T = {
   ivory:       '#FAF7F2',
   parchment:   '#F0EBE2',
@@ -410,7 +416,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
               <Link key={q.id} href={`/product/${q.dbId ?? q.id}`} style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, overflow: 'hidden', textDecoration: 'none', color: T.deep, display: 'block', transition: 'box-shadow 0.2s, transform 0.2s' }}>
                 <div style={{ aspectRatio: '1', background: T.parchment, position: 'relative', overflow: 'hidden' }}>
                   {q.images?.[0] ? (
-                    <Image src={q.images[0]} alt={q.name} fill style={{ objectFit: 'cover' }} sizes="200px" />
+                    <Image src={toImageUrl(q.images[0])} alt={q.name} fill style={{ objectFit: 'cover' }} sizes="200px" />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
                       <WatchFace dial={q.dial} size={90} />

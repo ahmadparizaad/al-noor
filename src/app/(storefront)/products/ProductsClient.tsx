@@ -12,6 +12,12 @@ import {
 import { useCart } from '@/lib/cart-store'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
 
+const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
+function toImageUrl(src: string): string {
+  if (src.startsWith('http')) return src
+  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto/${src}`
+}
+
 type SortKey = 'relevance' | 'popularity' | 'price-asc' | 'price-desc' | 'newest'
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -534,7 +540,7 @@ function ProductCard({ product: p, wished, onWish, onCart }: {
       <div style={{ width: '100%', aspectRatio: '1', background: '#F0EBE2', position: 'relative', overflow: 'hidden' }}>
         {p.images?.[0] ? (
           <Image
-            src={p.images[0]}
+            src={toImageUrl(p.images[0])}
             alt={p.name}
             fill
             style={{ objectFit: 'cover' }}
