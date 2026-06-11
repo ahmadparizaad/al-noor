@@ -11,11 +11,10 @@ import {
 } from '@/lib/products-data'
 import { useCart } from '@/lib/cart-store'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
 
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
 function toImageUrl(src: string): string {
-  if (src.startsWith('http')) return src
-  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto/${src}`
+  return toCloudinaryUrl(src)
 }
 
 type SortKey = 'relevance' | 'popularity' | 'price-asc' | 'price-desc' | 'newest'

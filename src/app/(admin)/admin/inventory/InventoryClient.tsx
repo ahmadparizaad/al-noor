@@ -7,11 +7,10 @@ import { useCatalogue } from '@/lib/catalogue-context'
 import { ImageUploader } from '@/components/admin/ImageUploader'
 import type { UploadedImage } from '@/hooks/useImageUpload'
 import { createProduct, updateProduct, deleteProduct, toggleProductActive, updateProductStock } from '@/lib/actions/admin'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
 
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
-function toCloudinaryUrl(publicId: string): string {
-  if (publicId.startsWith('http')) return publicId
-  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto,w_80/${publicId}`
+function toThumbUrl(publicId: string): string {
+  return toCloudinaryUrl(publicId, { width: 80 })
 }
 
 interface InventoryClientProps {
@@ -328,7 +327,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     {product.images?.[0] ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={toCloudinaryUrl(product.images[0])}
+                        src={toThumbUrl(product.images[0])}
                         alt={product.name}
                         loading="lazy"
                         style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '3px', border: `1px solid ${T.border}` }}

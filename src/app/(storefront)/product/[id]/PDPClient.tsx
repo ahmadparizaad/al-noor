@@ -9,11 +9,10 @@ import { DIAL_OPTIONS, MATERIALS, formatPrice, discount, type Product, type Dial
 import { buildSpecs, REVIEWS } from '@/lib/pdp-data'
 import { useCart } from '@/lib/cart-store'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
 
-const CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ''
 function toImageUrl(src: string): string {
-  if (src.startsWith('http')) return src
-  return `https://res.cloudinary.com/${CLOUD_NAME}/image/upload/f_auto,q_auto/${src}`
+  return toCloudinaryUrl(src)
 }
 
 const T = {
@@ -41,7 +40,8 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
   const [activeDial, setActiveDial]         = useState<DialColor>(initial.dial)
   const [activeMaterial, setActiveMaterial] = useState<Material>(initial.material)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
-  const hasImages = (initial.images?.length ?? 0) > 0
+  const imageUrls = (initial.images ?? []).map(img => toImageUrl(img)).filter(Boolean)
+  const hasImages = imageUrls.length > 0
   const [qty, setQty]                       = useState(1)
   const [wished, setWished]                 = useState(false)
   const [cartAdded, setCartAdded]           = useState(false)
@@ -126,7 +126,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
             <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: hasImages ? 0 : 32, position: 'relative', overflow: 'hidden' }}>
               {hasImages ? (
                 <Image
-                  src={initial.images![activeImageIdx]}
+                  src={imageUrls[activeImageIdx]}
                   alt={`${initial.name} — image ${activeImageIdx + 1}`}
                   fill
                   style={{ objectFit: 'cover' }}
@@ -147,7 +147,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
             {/* Thumbnails */}
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
               {hasImages ? (
-                initial.images!.map((url, idx) => (
+                imageUrls.map((url, idx) => (
                   <button
                     key={url}
                     onClick={() => setActiveImageIdx(idx)}
