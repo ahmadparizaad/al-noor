@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { initiatePayment } from '@/lib/phonepe'
 import { checkoutSchema } from '@/lib/validations'
 import { db } from '@/lib/db'
 import { orders, orderItems, products } from '@/lib/schema'
-import { eq, inArray } from 'drizzle-orm'
+import { inArray, sql, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized. Please sign in.' }, { status: 401 })
+  }
 
   const body = await req.json()
   const parsed = checkoutSchema.safeParse(body)
@@ -46,20 +48,20 @@ export async function POST(req: NextRequest) {
 
   const transactionId = `AL${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`
   const orderId = randomUUID()
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!
 
-  // Create order and order items in parallel
-  await Promise.all([
-    db.insert(orders).values({
+  // Create order, order items and decrement stock in a transaction to prevent foreign key violations
+  await db.transaction(async (tx) => {
+    await tx.insert(orders).values({
       id: orderId,
       userId: session?.user?.id,
-      status: 'pending',
+      status: 'confirmed',
       totalInr: totalInr.toFixed(2),
       shippingAddress: JSON.stringify(address),
       phonePeTransactionId: transactionId,
-      paymentStatus: 'pending',
-    }),
-    db.insert(orderItems).values(
+      paymentStatus: 'cod_pending',
+    })
+
+    await tx.insert(orderItems).values(
       items.map(item => ({
         id: randomUUID(),
         orderId,
@@ -67,21 +69,18 @@ export async function POST(req: NextRequest) {
         quantity: item.quantity,
         priceInr: dbProducts.find(p => p.id === item.productId)!.priceInr,
       }))
-    ),
-  ])
+    )
 
-  const result = await initiatePayment({
-    transactionId,
-    amountPaise: Math.round(totalInr * 100),
-    userId: session?.user?.id ?? `guest_${orderId}`,
-    redirectUrl: `${appUrl}/order-confirmation?orderId=${orderId}`,
-    callbackUrl: `${appUrl}/api/payments/callback`,
+    // Decrement stock for the ordered items
+    for (const item of items) {
+      await tx
+        .update(products)
+        .set({
+          stock: sql`${products.stock} - ${item.quantity}`,
+        })
+        .where(eq(products.id, item.productId))
+    }
   })
 
-  if (!result.success) {
-    return NextResponse.json({ error: 'Payment initiation failed' }, { status: 502 })
-  }
-
-  const redirectUrl = result.data?.instrumentResponse?.redirectInfo?.url
-  return NextResponse.json({ redirectUrl, orderId })
+  return NextResponse.json({ success: true, orderId })
 }
