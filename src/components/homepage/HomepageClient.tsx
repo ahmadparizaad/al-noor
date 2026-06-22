@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { WatchFace } from '@/components/ui/WatchFace'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
 import { formatPrice, type DialColor, type Product } from '@/lib/products-data'
 import { useCart } from '@/lib/cart-store'
 import { useSession } from 'next-auth/react'
@@ -264,18 +265,29 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
               <Link key={product.id} href={`/product/${product.dbId ?? product.id}`} className="product-card no-underline block" style={{ animation: `fadeUp .7s ${idx * 0.1}s cubic-bezier(.22,.68,0,1.2) both` }}>
                 <div className="bg-white border border-gold/10 rounded-xs overflow-hidden shadow-[0_2px_12px_rgba(26,20,16,0.05)] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(26,20,16,0.12)] hover:-translate-y-1">
                   {/* Watch display */}
-                  <div className="bg-parchment py-9 flex justify-center items-center relative overflow-hidden">
-                    <div className="absolute top-3.5 left-3.5 text-ivory bg-deep/75 text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded-[1px]" style={{ fontFamily: UI }}>
+                  <div className="bg-parchment w-full aspect-square flex justify-center items-center relative overflow-hidden">
+                    <div className="absolute top-3.5 left-3.5 text-ivory bg-deep/75 text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded-[1px] z-10" style={{ fontFamily: UI }}>
                       {product.category}
                     </div>
                     {product.badge && (
-                      <div className={`absolute top-3.5 right-3.5 text-white text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded-[1px] ${product.badgeType === 'sale' ? 'bg-danger' : 'bg-gold'}`} style={{ fontFamily: UI }}>
+                      <div className={`absolute top-3.5 right-3.5 text-white text-[9px] font-bold tracking-widest uppercase px-2.5 py-0.5 rounded-[1px] z-10 ${product.badgeType === 'sale' ? 'bg-danger' : 'bg-gold'}`} style={{ fontFamily: UI }}>
                         {product.badge}
                       </div>
                     )}
-                    <div className="card-watch">
-                      <WatchFace dial={product.dial} size={150} />
-                    </div>
+                    {product.images?.[0] ? (
+                      <Image
+                        src={toCloudinaryUrl(product.images[0])}
+                        alt={product.name}
+                        fill
+                        sizes="(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        style={{ objectFit: 'cover' }}
+                        className="card-watch"
+                      />
+                    ) : (
+                      <div className="card-watch">
+                        <WatchFace dial={product.dial} size={150} />
+                      </div>
+                    )}
                   </div>
 
                   {/* Info */}
