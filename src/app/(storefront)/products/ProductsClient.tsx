@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { WatchFace } from '@/components/ui/WatchFace'
 import {
-  CATEGORIES, MATERIALS, DIAL_OPTIONS,
   formatPrice, discount,
   type Category, type Material, type DialColor, type Product,
 } from '@/lib/products-data'
@@ -28,25 +27,28 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 ]
 
 interface Filters {
-  categories: Category[]
-  materials: Material[]
-  dials: DialColor[]
+  categories: string[]
+  materials: string[]
+  dials: string[]
   minRating: number | null
   priceMax: number
 }
 
-const INITIAL_FILTERS: Filters = {
-  categories: [],
-  materials: [],
-  dials: [],
-  minRating: null,
-  priceMax: 130000,
+interface ProductsClientProps {
+  products: Product[]
+  categories?: string[]
+  materials?: string[]
+  dials?: string[]
 }
 
-export function ProductsClient({ products: allProducts }: { products: Product[] }) {
+export function ProductsClient({
+  products: allProducts,
+  categories = [],
+  materials = [],
+  dials = [],
+}: ProductsClientProps) {
   const [search, setSearch]   = useState('')
   const [sort, setSort]       = useState<SortKey>('relevance')
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS)
   const [wished, setWished]   = useState<Set<number>>(new Set())
   const [toast, setToast]     = useState<string | null>(null)
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
@@ -56,6 +58,26 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     new Set(['category', 'price', 'material', 'dial', 'rating'])
   )
 
+  const maxProductPrice = useMemo(() => {
+    if (allProducts.length === 0) return 130000
+    const maxVal = Math.max(...allProducts.map(p => p.price))
+    return Math.ceil(maxVal / 5000) * 5000
+  }, [allProducts])
+
+  const minProductPrice = useMemo(() => {
+    if (allProducts.length === 0) return 0
+    const minVal = Math.min(...allProducts.map(p => p.price))
+    return Math.floor(minVal / 5000) * 5000
+  }, [allProducts])
+
+  const [filters, setFilters] = useState<Filters>(() => ({
+    categories: [],
+    materials: [],
+    dials: [],
+    minRating: null,
+    priceMax: maxProductPrice,
+  }))
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 2400)
@@ -64,12 +86,16 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
   function toggleGroup(key: string) {
     setOpenGroups(prev => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
       return next
     })
   }
 
-  function toggleCategory(cat: Category) {
+  function toggleCategory(cat: string) {
     setFilters(f => ({
       ...f,
       categories: f.categories.includes(cat)
@@ -78,7 +104,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     }))
   }
 
-  function toggleMaterial(mat: Material) {
+  function toggleMaterial(mat: string) {
     setFilters(f => ({
       ...f,
       materials: f.materials.includes(mat)
@@ -87,7 +113,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     }))
   }
 
-  function toggleDial(dial: DialColor) {
+  function toggleDial(dial: string) {
     setFilters(f => ({
       ...f,
       dials: f.dials.includes(dial)
@@ -96,10 +122,16 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     }))
   }
 
-  function clearFilters() {
-    setFilters(INITIAL_FILTERS)
+  const clearFilters = useCallback(() => {
+    setFilters({
+      categories: [],
+      materials: [],
+      dials: [],
+      minRating: null,
+      priceMax: maxProductPrice,
+    })
     showToast('All filters cleared')
-  }
+  }, [maxProductPrice])
 
   const activeChips = useMemo(() => {
     const chips: { label: string; clear: () => void }[] = []
@@ -110,12 +142,12 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
       label: `${filters.minRating}★ & above`,
       clear: () => setFilters(f => ({ ...f, minRating: null }))
     })
-    if (filters.priceMax < 130000) chips.push({
+    if (filters.priceMax < maxProductPrice) chips.push({
       label: `Up to ₹${filters.priceMax.toLocaleString('en-IN')}`,
-      clear: () => setFilters(f => ({ ...f, priceMax: 130000 }))
+      clear: () => setFilters(f => ({ ...f, priceMax: maxProductPrice }))
     })
     return chips
-  }, [filters])
+  }, [filters, maxProductPrice])
 
   const filtered = useMemo(() => {
     let list: Product[] = [...allProducts]
@@ -145,7 +177,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     }
 
     return list
-  }, [search, filters, sort])
+  }, [allProducts, search, filters, sort])
 
   const toggleWish = useCallback((id: number, name: string, e: React.MouseEvent) => {
     e.preventDefault()
@@ -161,13 +193,20 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
     const counts: Record<string, number> = {}
     allProducts.forEach(p => { counts[p.category] = (counts[p.category] ?? 0) + 1 })
     return counts
-  }, [])
+  }, [allProducts])
 
   return (
-    <div className="min-h-screen" style={{ background: '#F0EBE2', fontFamily: "'Raleway', sans-serif" }}>
+    <div className="min-h-screen" style={{
+      background: '#F0EBE2',
+      fontFamily: "'Raleway', sans-serif",
+      height: isMobile ? 'auto' : '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: isMobile ? 'visible' : 'hidden',
+    }}>
 
       {/* ── Nav ── */}
-      <header style={{ position: 'sticky', top: 0, zIndex: 200, background: '#FAF7F2', borderBottom: '1px solid rgba(158,127,74,0.18)', boxShadow: '0 1px 4px rgba(26,20,16,0.06)' }}>
+      <header style={{ position: 'sticky', top: 0, zIndex: 200, background: '#FAF7F2', borderBottom: '1px solid rgba(158,127,74,0.18)', boxShadow: '0 1px 4px rgba(26,20,16,0.06)', flexShrink: 0 }}>
         <div style={{ maxWidth: 1400, margin: '0 auto', padding: '0 16px', height: isMobile ? 56 : 64, display: 'flex', alignItems: 'center', gap: isMobile ? 12 : 24 }}>
           <Link href="/" style={{ fontWeight: 600, fontSize: isMobile ? 13 : 15, letterSpacing: '0.35em', color: '#9E7F4A', whiteSpace: 'nowrap', flexShrink: 0, textDecoration: 'none' }}>
             AL NOOR
@@ -199,13 +238,13 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
                 </span>
               ) : null}
             </Link>
-            {!isMobile && <a href="mailto:enquire@alnoor.com" style={{ background: '#9E7F4A', color: '#FAF7F2', padding: '8px 20px', borderRadius: 2, fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textDecoration: 'none' }}>Enquire</a>}
+            {!isMobile && <a href="https://wa.me/919067960830" target="_blank" rel="noopener noreferrer" style={{ background: '#9E7F4A', color: '#FAF7F2', padding: '8px 20px', borderRadius: 2, fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textDecoration: 'none' }}>Enquire</a>}
           </nav>
         </div>
       </header>
 
       {/* ── Breadcrumb ── */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8C7B65' }}>
+      <div style={{ maxWidth: 1400, width: '100%', margin: '0 auto', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#8C7B65', flexShrink: 0 }}>
         <Link href="/" style={{ color: '#8C7B65', textDecoration: 'none' }}>Home</Link>
         <span style={{ color: '#B8A99A' }}>›</span>
         <span style={{ color: '#1A1410', fontWeight: 500 }}>Luxury Timepieces</span>
@@ -213,7 +252,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
 
       {/* ── Mobile filter bar ── */}
       {isMobile ? (
-        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 10 }}>
+        <div style={{ padding: '0 16px 10px', display: 'flex', gap: 10, flexShrink: 0 }}>
           <button
             onClick={() => setFilterDrawerOpen(true)}
             style={{ flex: 1, height: 40, border: '1.5px solid rgba(158,127,74,0.25)', borderRadius: 2, background: '#fff', fontSize: 13, fontWeight: 600, color: '#5C4F3A', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer' }}
@@ -244,21 +283,21 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
               </div>
             </div>
             <FilterGroup label="Category" open={openGroups.has('category')} onToggle={() => toggleGroup('category')}>
-              {CATEGORIES.map(cat => <FilterOption key={`drawer-cat-${cat}`} label={cat} count={categoryCounts[cat] ?? 0} checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} />)}
+              {categories.map(cat => <FilterOption key={`drawer-cat-${cat}`} label={cat} count={categoryCounts[cat] ?? 0} checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} />)}
             </FilterGroup>
             <FilterGroup label="Price" open={openGroups.has('price')} onToggle={() => toggleGroup('price')}>
               <div style={{ padding: '4px 0 10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5C4F3A', marginBottom: 10, fontWeight: 500 }}>
-                  <span>₹0</span><span>₹{filters.priceMax.toLocaleString('en-IN')}</span>
+                  <span>₹{minProductPrice.toLocaleString('en-IN')}</span><span>₹{filters.priceMax.toLocaleString('en-IN')}</span>
                 </div>
-                <input type="range" min={20000} max={130000} step={5000} value={filters.priceMax} onChange={e => setFilters(f => ({ ...f, priceMax: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#9E7F4A', cursor: 'pointer' }} />
+                <input type="range" min={minProductPrice} max={maxProductPrice} step={5000} value={filters.priceMax} onChange={e => setFilters(f => ({ ...f, priceMax: Number(e.target.value) }))} style={{ width: '100%', accentColor: '#9E7F4A', cursor: 'pointer' }} />
               </div>
             </FilterGroup>
             <FilterGroup label="Case Material" open={openGroups.has('material')} onToggle={() => toggleGroup('material')}>
-              {MATERIALS.map(mat => <FilterOption key={`drawer-mat-${mat}`} label={mat} checked={filters.materials.includes(mat)} onChange={() => toggleMaterial(mat)} />)}
+              {materials.map(mat => <FilterOption key={`drawer-mat-${mat}`} label={mat} checked={filters.materials.includes(mat)} onChange={() => toggleMaterial(mat)} />)}
             </FilterGroup>
             <FilterGroup label="Dial Colour" open={openGroups.has('dial')} onToggle={() => toggleGroup('dial')}>
-              {DIAL_OPTIONS.map(dial => <FilterOption key={`drawer-dial-${dial}`} label={dial} checked={filters.dials.includes(dial)} onChange={() => toggleDial(dial)} />)}
+              {dials.map(dial => <FilterOption key={`drawer-dial-${dial}`} label={dial} checked={filters.dials.includes(dial)} onChange={() => toggleDial(dial)} />)}
             </FilterGroup>
             <FilterGroup label="Rating" open={openGroups.has('rating')} onToggle={() => toggleGroup('rating')}>
               {[4, 3].map(r => (
@@ -278,10 +317,32 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
       ) : null}
 
       {/* ── Page body ── */}
-      <div style={{ maxWidth: 1400, margin: '0 auto', padding: isMobile ? '0 16px 80px' : '0 24px 48px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div style={{
+        maxWidth: 1400,
+        width: '100%',
+        margin: '0 auto',
+        padding: isMobile ? '0 16px 80px' : '0 24px 24px',
+        display: 'flex',
+        gap: 20,
+        alignItems: 'flex-start',
+        flex: isMobile ? 'none' : 1,
+        overflow: isMobile ? 'visible' : 'hidden',
+        height: isMobile ? 'auto' : '100%',
+      }}>
 
         {/* ── Sidebar (desktop/tablet only) ── */}
-        {!isMobile ? <aside style={{ width: isTablet ? 200 : 240, flexShrink: 0, position: 'sticky', top: 76, background: '#fff', border: '1px solid rgba(158,127,74,0.10)', borderRadius: 2, boxShadow: '0 1px 4px rgba(26,20,16,0.06)', overflow: 'hidden' }}>
+        {!isMobile ? <aside style={{
+          width: isTablet ? 200 : 240,
+          flexShrink: 0,
+          height: '100%',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          scrollbarWidth: 'thin',
+          background: '#fff',
+          border: '1px solid rgba(158,127,74,0.10)',
+          borderRadius: 2,
+          boxShadow: '0 1px 4px rgba(26,20,16,0.06)',
+        }}>
           <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid rgba(158,127,74,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 15, fontWeight: 600, color: '#1A1410' }}>Filters</span>
             {activeChips.length > 0 ? (
@@ -291,7 +352,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
 
           {/* Category */}
           <FilterGroup label="Category" open={openGroups.has('category')} onToggle={() => toggleGroup('category')}>
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <FilterOption
                 key={`sidebar-cat-${cat}`}
                 label={cat}
@@ -306,13 +367,13 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
           <FilterGroup label="Price" open={openGroups.has('price')} onToggle={() => toggleGroup('price')}>
             <div style={{ padding: '4px 0 10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#5C4F3A', marginBottom: 10, fontWeight: 500 }}>
-                <span>₹0</span>
+                <span>₹{minProductPrice.toLocaleString('en-IN')}</span>
                 <span>₹{filters.priceMax.toLocaleString('en-IN')}</span>
               </div>
               <input
                 type="range"
-                min={20000}
-                max={130000}
+                min={minProductPrice}
+                max={maxProductPrice}
                 step={5000}
                 value={filters.priceMax}
                 onChange={e => setFilters(f => ({ ...f, priceMax: Number(e.target.value) }))}
@@ -323,7 +384,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
 
           {/* Case Material */}
           <FilterGroup label="Case Material" open={openGroups.has('material')} onToggle={() => toggleGroup('material')}>
-            {MATERIALS.map(mat => (
+            {materials.map(mat => (
               <FilterOption
                 key={`sidebar-mat-${mat}`}
                 label={mat}
@@ -335,7 +396,7 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
 
           {/* Dial Colour */}
           <FilterGroup label="Dial Colour" open={openGroups.has('dial')} onToggle={() => toggleGroup('dial')}>
-            {DIAL_OPTIONS.map(dial => (
+            {dials.map(dial => (
               <FilterOption
                 key={`sidebar-dial-${dial}`}
                 label={dial}
@@ -364,7 +425,15 @@ export function ProductsClient({ products: allProducts }: { products: Product[] 
         </aside> : null}
 
         {/* ── Main ── */}
-        <main style={{ flex: 1, minWidth: 0 }}>
+        <main style={{
+          flex: 1,
+          minWidth: 0,
+          height: isMobile ? 'auto' : '100%',
+          overflowY: isMobile ? 'visible' : 'auto',
+          overscrollBehavior: isMobile ? 'auto' : 'contain',
+          scrollbarWidth: isMobile ? 'auto' : 'thin',
+          paddingRight: isMobile ? 0 : 8,
+        }}>
 
           {/* Sort bar (desktop/tablet only — mobile uses dropdown above) */}
           {!isMobile ? (
@@ -550,24 +619,43 @@ function ProductCard({ product: p, wished, onWish, onCart }: {
             <WatchFace dial={p.dial} size={140} />
           </div>
         )}
+
+        {/* Rating overlay inside image bottom-left */}
+        <div style={{
+          position: 'absolute',
+          bottom: 10,
+          left: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          background: 'rgba(255, 255, 255, 0.90)',
+          backdropFilter: 'blur(4px)',
+          padding: '4px 8px',
+          borderRadius: 4,
+          fontSize: 11,
+          fontWeight: 600,
+          color: '#1A1410',
+          boxShadow: '0 2px 8px rgba(26, 20, 16, 0.15)',
+          zIndex: 3,
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 700 }}>
+            {p.rating}
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="#9E7F4A">
+              <polygon points="6,1 7.5,4.5 11,5 8.5,7.5 9,11 6,9.5 3,11 3.5,7.5 1,5 4.5,4.5" />
+            </svg>
+          </span>
+          <span style={{ color: 'rgba(158, 127, 74, 0.3)', margin: '0 2px' }}>|</span>
+          <span style={{ color: '#5C4F3A', fontSize: 10 }}>{p.reviews.toLocaleString()}</span>
+        </div>
       </div>
 
       {/* Body */}
       <div style={{ padding: '12px 14px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 5, borderTop: '1px solid rgba(158,127,74,0.10)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9E7F4A' }}>Al Noor</div>
-        <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 15, fontWeight: 500, color: '#1A1410', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 500, color: '#1A1410', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
           {p.name}
         </div>
         <div style={{ fontSize: 10, color: '#B8A99A', letterSpacing: '0.06em' }}>{p.ref} · {p.material}</div>
-
-        {/* Rating */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 3, background: '#27864A', color: '#fff', borderRadius: 3, padding: '2px 6px', fontSize: 11, fontWeight: 700 }}>
-            {p.rating}
-            <svg viewBox="0 0 12 12" width="9" height="9" fill="#fff"><polygon points="6,1 7.5,4.5 11,5 8.5,7.5 9,11 6,9.5 3,11 3.5,7.5 1,5 4.5,4.5" /></svg>
-          </span>
-          <span style={{ fontSize: 11, color: '#B8A99A' }}>({p.reviews.toLocaleString()})</span>
-        </div>
 
         {/* Price */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
@@ -581,22 +669,6 @@ function ProductCard({ product: p, wished, onWish, onCart }: {
           <strong style={{ color: '#27864A', fontWeight: 600 }}>{p.delivery}</strong> by tomorrow
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <button
-            onClick={(e) => { e.preventDefault(); onCart() }}
-            style={{ flex: 1, height: 36, background: '#9E7F4A', color: '#fff', borderRadius: 2, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-          >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="#fff"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zm0 0h12M16 10a4 4 0 01-8 0" stroke="#fff" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
-            Add
-          </button>
-          <button
-            onClick={(e) => { e.preventDefault(); window.location.href = `/product/${p.id}` }}
-            style={{ flex: 1, height: 36, background: '#F0EBE2', color: '#7A5C2E', border: '1px solid #9E7F4A', borderRadius: 2, fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer' }}
-          >
-            Buy Now
-          </button>
-        </div>
       </div>
     </Link>
   )

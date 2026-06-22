@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { useCart } from '@/lib/cart-store'
 
 const T = {
   ivory:       '#FAF7F2',
@@ -24,7 +25,7 @@ const T = {
   red:         '#C0392B',
 }
 
-type PaymentStatus = 'loading' | 'success' | 'failed' | 'pending'
+type PaymentStatus = 'loading' | 'success' | 'failed' | 'pending' | 'cod'
 
 interface OrderDetail {
   id: string
@@ -38,6 +39,7 @@ function ConfirmationInner() {
   const params  = useSearchParams()
   const orderId = params.get('orderId') ?? ''
   const { isMobile } = useBreakpoint()
+  const { clearCart } = useCart()
 
   const [payStatus, setPayStatus] = useState<PaymentStatus>('loading')
   const [order, setOrder]         = useState<OrderDetail | null>(null)
@@ -49,7 +51,13 @@ function ConfirmationInner() {
   const deliveryStr = deliveryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
 
   useEffect(() => {
-    if (!orderId) { setPayStatus('failed'); setError('Order ID not found.'); return }
+    if (!orderId) {
+      Promise.resolve().then(() => {
+        setPayStatus('failed')
+        setError('Order ID not found.')
+      })
+      return
+    }
 
     async function fetchStatus() {
       try {
@@ -61,17 +69,27 @@ function ConfirmationInner() {
         const data = await res.json()
         if (!res.ok) { setPayStatus('failed'); setError(data.error ?? 'Could not load order.'); return }
         setOrder(data)
-        if (data.paymentStatus === 'paid')    setPayStatus('success')
-        else if (data.paymentStatus === 'failed') setPayStatus('failed')
-        else setPayStatus('pending')
+        if (data.paymentStatus === 'paid') {
+          setPayStatus('success')
+          clearCart()
+        } else if (data.paymentStatus === 'failed') {
+          setPayStatus('failed')
+        } else if (data.paymentStatus === 'cod_pending') {
+          setPayStatus('cod')
+          clearCart()
+        } else {
+          setPayStatus('pending')
+          clearCart()
+        }
       } catch {
         // If API isn't wired yet (no DB), show success state for demo
         setPayStatus('success')
         setOrder({ id: orderId, status: 'confirmed', paymentStatus: 'paid', totalInr: '0', createdAt: new Date().toISOString() })
+        clearCart()
       }
     }
     fetchStatus()
-  }, [orderId])
+  }, [orderId, clearCart])
 
   if (payStatus === 'loading') {
     return (
@@ -117,6 +135,8 @@ function ConfirmationInner() {
         <p style={{ fontSize: 15, color: T.muted, lineHeight: 1.6 }}>
           {payStatus === 'pending'
             ? "Your payment is being verified. We'll confirm your order shortly."
+            : payStatus === 'cod'
+            ? "Thank you for your order. Your order is confirmed and your timepiece will be prepared in our atelier. Please pay via Cash or UPI at the time of delivery."
             : 'Thank you for your order. Your timepiece will be dispatched from our Geneva atelier.'}
         </p>
       </div>
@@ -140,7 +160,7 @@ function ConfirmationInner() {
           {/* Status pills */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
             {[
-              { label: 'Payment', value: payStatus === 'success' ? 'Paid' : 'Pending', color: payStatus === 'success' ? T.green : '#D97706' },
+              { label: 'Payment', value: payStatus === 'success' ? 'Paid' : (payStatus === 'cod' ? 'Cash on Delivery' : 'Pending'), color: payStatus === 'success' ? T.green : (payStatus === 'cod' ? T.gold : '#D97706') },
               { label: 'Order', value: 'Confirmed', color: T.green },
               { label: 'Dispatch', value: 'Processing', color: '#9E7F4A' },
             ].map(pill => (
@@ -159,7 +179,7 @@ function ConfirmationInner() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={T.green} strokeWidth="1.8"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m0 0h3l3 4v4h-3m-3-7H9"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: T.deep }}>Expected Delivery by {deliveryStr}</div>
-              <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>Insured express courier from Geneva · Signature required</div>
+              <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{payStatus === 'cod' ? 'Insured express courier via Delhivery · Pay on Delivery' : 'Insured express courier from Geneva · Signature required'}</div>
             </div>
           </div>
 

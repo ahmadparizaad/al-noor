@@ -52,41 +52,46 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Spacer so content doesn't hide behind nav */}
-      <div className="h-16" />
+      {/* Spacer so content doesn't hide behind nav on mobile */}
+      <div className="h-16 md:hidden" />
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
-        <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
-          {navItems.map(({ label, href, icon }) => {
-            const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
+      <div className="group fixed bottom-0 left-0 right-0 z-50">
+        {/* Invisible trigger zone at the very bottom (20px height) */}
+        <div className="absolute bottom-0 left-0 right-0 h-5 bg-transparent" />
 
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors ${
-                  active ? 'text-blue-600' : 'text-gray-500'
-                }`}
-              >
-                <span className="relative">
-                  {icon(active)}
-                  {label === 'Cart' && totalItems > 0 && (
-                    <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
-                      {totalItems > 99 ? '99+' : totalItems}
-                    </span>
+        <nav className="transform translate-y-0 md:translate-y-full md:group-hover:translate-y-0 focus-within:translate-y-0 transition-transform duration-300 ease-out bg-white border-t border-gray-200 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+            {navItems.map(({ label, href, icon }) => {
+              const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
+
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`relative flex flex-col items-center justify-center gap-0.5 flex-1 py-2 transition-colors ${
+                    active ? 'text-blue-600' : 'text-gray-500'
+                  }`}
+                >
+                  <span className="relative">
+                    {icon(active)}
+                    {label === 'Cart' && totalItems > 0 && (
+                      <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
+                        {totalItems > 99 ? '99+' : totalItems}
+                      </span>
+                    )}
+                  </span>
+                  <span className={`text-[10px] font-medium tracking-wide ${active ? 'text-blue-600' : 'text-gray-500'}`}>
+                    {label}
+                  </span>
+                  {active && (
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-b-full bg-blue-600" />
                   )}
-                </span>
-                <span className={`text-[10px] font-medium tracking-wide ${active ? 'text-blue-600' : 'text-gray-500'}`}>
-                  {label}
-                </span>
-                {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-b-full bg-blue-600" />
-                )}
-              </Link>
-            )
-          })}
-        </div>
-      </nav>
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+      </div>
     </>
   )
 }

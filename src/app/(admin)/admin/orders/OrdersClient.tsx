@@ -3,6 +3,7 @@
 import { Fragment, useState } from 'react'
 import { AdminOrder, OrderStatus } from '@/types/admin'
 import { formatPrice } from '@/lib/products-data'
+import { updateOrderStatus } from '@/lib/actions/admin'
 
 type DatePreset = 'all' | 'today' | 'yesterday' | 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'last_year' | 'custom'
 
@@ -133,16 +134,39 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
     setTrackingNumbers(prev => ({ ...prev, [orderId]: value }))
   }
 
-  const handleSaveOrder = (orderId: string) => {
+  const handleSaveOrder = async (orderId: string) => {
     const newStatus = editingStatus[orderId]
     const newTracking = trackingNumbers[orderId]
 
     if (newStatus) {
-      setOrders(orders.map(o =>
-        o.id === orderId
-          ? { ...o, status: newStatus, trackingNumber: newTracking || o.trackingNumber }
-          : o
-      ))
+      try {
+        const result = await updateOrderStatus(orderId, newStatus, newTracking)
+        const savedTracking = result?.trackingNumber || newTracking
+
+        setOrders(orders.map(o =>
+          o.id === orderId
+            ? { ...o, status: newStatus, trackingNumber: savedTracking || o.trackingNumber }
+            : o
+        ))
+      } catch (err) {
+        console.error('Failed to save order updates:', err)
+        alert('Failed to save order updates. Please check authorization.')
+      }
+    } else if (newTracking) {
+      try {
+        const currentOrder = orders.find(o => o.id === orderId)
+        const status = currentOrder?.status || 'pending'
+        const result = await updateOrderStatus(orderId, status, newTracking)
+        
+        setOrders(orders.map(o =>
+          o.id === orderId
+            ? { ...o, trackingNumber: newTracking }
+            : o
+        ))
+      } catch (err) {
+        console.error('Failed to save tracking number:', err)
+        alert('Failed to save tracking number. Please check authorization.')
+      }
     }
 
     setEditingStatus(prev => {

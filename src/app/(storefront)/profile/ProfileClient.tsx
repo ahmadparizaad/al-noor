@@ -82,6 +82,7 @@ export function ProfileClient() {
   const [formError, setFormError]   = useState<string | null>(null)
 
   const fetchAddresses = useCallback(async () => {
+    await Promise.resolve()
     setLoadingAddr(true)
     try {
       const res  = await fetch('/api/user/addresses')

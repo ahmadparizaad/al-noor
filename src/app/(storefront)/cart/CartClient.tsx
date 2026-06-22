@@ -1,11 +1,17 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCart } from '@/lib/cart-store'
 import { WatchFace } from '@/components/ui/WatchFace'
 import { formatPrice, discount } from '@/lib/products-data'
 import { useState } from 'react'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
+
+function toImageUrl(src: string): string {
+  return toCloudinaryUrl(src)
+}
 
 const T = {
   ivory:       '#FAF7F2',
@@ -105,15 +111,41 @@ export function CartClient() {
                   <div key={p.id} style={{ display: 'flex', gap: isMobile ? 12 : 20, padding: isMobile ? '16px' : '20px 24px', borderBottom: idx < items.length - 1 ? `1px solid ${T.borderLight}` : 'none', alignItems: 'flex-start' }}>
 
                     {/* Watch image */}
-                    <Link href={`/product/${p.id}`} style={{ flexShrink: 0, width: isMobile ? 80 : 120, height: isMobile ? 80 : 120, background: T.parchment, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${T.borderLight}`, textDecoration: 'none' }}>
-                      <WatchFace dial={p.dial} size={isMobile ? 60 : 90} />
+                    <Link
+                      href={`/product/${p.dbId ?? p.id}`}
+                      style={{
+                        flexShrink: 0,
+                        width: isMobile ? 80 : 120,
+                        height: isMobile ? 80 : 120,
+                        background: T.parchment,
+                        borderRadius: 2,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: `1px solid ${T.borderLight}`,
+                        textDecoration: 'none'
+                      }}
+                    >
+                      {p.images?.[0] ? (
+                        <Image
+                          src={toImageUrl(p.images[0])}
+                          alt={p.name}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="(max-width: 600px) 80px, 120px"
+                        />
+                      ) : (
+                        <WatchFace dial={p.dial} size={isMobile ? 60 : 90} />
+                      )}
                     </Link>
 
                     {/* Item details */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.gold, marginBottom: 3 }}>Al Noor</div>
-                      <Link href={`/product/${p.id}`} style={{ textDecoration: 'none' }}>
-                        <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 17, color: T.deep, lineHeight: 1.3, marginBottom: 3 }}>{p.name}</div>
+                      <Link href={`/product/${p.dbId ?? p.id}`} style={{ textDecoration: 'none' }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 17, color: T.deep, lineHeight: 1.3, marginBottom: 3 }}>{p.name}</div>
                       </Link>
                       <div style={{ fontSize: 11, color: T.light, letterSpacing: '0.05em', marginBottom: 10 }}>{p.ref} · {p.material} · {p.dial}</div>
 
@@ -202,7 +234,7 @@ export function CartClient() {
                 {[
                   { icon: '🛡️', title: '5-Year Warranty', sub: 'Full movement coverage' },
                   { icon: '📦', title: 'Free Returns', sub: '30-day hassle-free policy' },
-                  { icon: '🔒', title: 'Secure Payment', sub: 'PhonePe · Cards · UPI' },
+                  { icon: '💵', title: 'Cash on Delivery', sub: 'COD via Delhivery' },
                 ].map(g => (
                   <div key={g.title} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 4 : 6 }}>
                     <span style={{ fontSize: isMobile ? 18 : 22 }}>{g.icon}</span>
@@ -270,7 +302,7 @@ export function CartClient() {
             <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, padding: '14px 20px', marginTop: 12 }}>
               <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10 }}>Accepted Payments</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {['PhonePe', 'UPI', 'Visa', 'Mastercard', 'Net Banking', 'EMI'].map(method => (
+                {['Cash on Delivery', 'Delhivery'].map(method => (
                   <span key={method} style={{ fontSize: 11, padding: '3px 10px', border: `1px solid ${T.borderLight}`, borderRadius: 2, color: T.mid, fontWeight: 500 }}>{method}</span>
                 ))}
               </div>

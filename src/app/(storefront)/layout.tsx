@@ -13,7 +13,9 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
     <>
       <main>{children}</main>
       <BottomNav />
-      <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA4_ID!} />
+      {process.env.NEXT_PUBLIC_GA4_ID && (
+        <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA4_ID} />
+      )}
     </>
   )
 }

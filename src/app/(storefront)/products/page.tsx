@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { getAllProducts } from '@/lib/actions/products'
 import { toClientProduct } from '@/lib/product-mapper'
+import { getCatalogueOptions } from '@/lib/actions/catalogue'
 import { ProductsClient } from './ProductsClient'
 
 export const metadata: Metadata = {
@@ -9,7 +10,17 @@ export const metadata: Metadata = {
 }
 
 export default async function ProductsPage() {
-  const dbProducts = await getAllProducts()
+  const [dbProducts, catalogue] = await Promise.all([
+    getAllProducts(),
+    getCatalogueOptions(),
+  ])
   const products = dbProducts.map((p, i) => toClientProduct(p, i))
-  return <ProductsClient products={products} />
+  return (
+    <ProductsClient
+      products={products}
+      categories={catalogue.category}
+      materials={catalogue.material}
+      dials={catalogue.dial}
+    />
+  )
 }

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getProductById, getProductsAllIds, getAllProducts } from '@/lib/actions/products'
 import { toClientProduct } from '@/lib/product-mapper'
 import { formatPrice, discount } from '@/lib/products-data'
+import { getCatalogueOptions } from '@/lib/actions/catalogue'
 import { PDPClient } from './PDPClient'
 
 interface Props {
@@ -27,9 +28,20 @@ export async function generateStaticParams() {
 
 export default async function ProductPage({ params }: Props) {
   const { id } = await params
-  const [p, allDb] = await Promise.all([getProductById(id), getAllProducts()])
+  const [p, allDb, catalogue] = await Promise.all([
+    getProductById(id),
+    getAllProducts(),
+    getCatalogueOptions(),
+  ])
   if (!p) notFound()
   const clientProduct = toClientProduct(p, 0)
   const allProducts = allDb.map((q, i) => toClientProduct(q, i))
-  return <PDPClient product={clientProduct} allProducts={allProducts} />
+  return (
+    <PDPClient
+      product={clientProduct}
+      allProducts={allProducts}
+      materials={catalogue.material}
+      dialOptions={catalogue.dial}
+    />
+  )
 }

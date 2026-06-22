@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useCart } from '@/lib/cart-store'
 import { WatchFace } from '@/components/ui/WatchFace'
 import { formatPrice, discount } from '@/lib/products-data'
 import { useSession } from 'next-auth/react'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { toCloudinaryUrl } from '@/lib/cloudinary-client'
+
+function toImageUrl(src: string): string {
+  return toCloudinaryUrl(src)
+}
 
 const T = {
   ivory:       '#FAF7F2',
@@ -75,6 +81,7 @@ export function CheckoutClient() {
   const [errors, setErrors]         = useState<Partial<Record<keyof Address, string>>>({})
   const [loading, setLoading]       = useState(false)
   const [apiError, setApiError]     = useState<string | null>(null)
+  const [checkingServiceability, setCheckingServiceability] = useState(false)
 
   // Saved addresses (logged-in users)
   const [savedAddresses, setSavedAddresses]     = useState<SavedAddress[]>([])
@@ -117,11 +124,37 @@ export function CheckoutClient() {
     setErrors({})
   }
 
-  function handleAddressSubmit(e: React.FormEvent) {
+  async function handleAddressSubmit(e: React.FormEvent) {
     e.preventDefault()
     const errs = validate(address)
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
+    
+    setCheckingServiceability(true)
+    try {
+      const res = await fetch(`/api/shipping/serviceability?pincode=${address.pincode}`)
+      if (!res.ok) {
+        setErrors({ pincode: 'Could not verify shipping serviceability' })
+        setCheckingServiceability(false)
+        return
+      }
+      const data = await res.json()
+      if (!data.isServiceable) {
+        setErrors({ pincode: 'Delivery is not available to this pincode via Delhivery' })
+        setCheckingServiceability(false)
+        return
+      }
+      if (!data.isCod) {
+        setErrors({ pincode: 'Cash on Delivery (COD) is not available for this pincode via Delhivery' })
+        setCheckingServiceability(false)
+        return
+      }
+    } catch (err) {
+      setErrors({ pincode: 'Failed to verify shipping serviceability. Please try again.' })
+      setCheckingServiceability(false)
+      return
+    }
+    setCheckingServiceability(false)
     setStep('review')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -144,21 +177,65 @@ export function CheckoutClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           address,
-          items: items.map(i => ({ productId: i.product.id.toString(), quantity: i.quantity })),
+          items: items.map(i => ({ productId: i.product.dbId ?? i.product.id.toString(), quantity: i.quantity })),
         }),
       })
       const data = await res.json()
-      if (!res.ok || !data.redirectUrl) {
-        setApiError(data.error ?? 'Payment initiation failed. Please try again.')
+      if (!res.ok || !data.success || !data.orderId) {
+        setApiError(data.error ?? 'Failed to place the order. Please try again.')
         setLoading(false)
         return
       }
+
       clearCart()
-      window.location.href = data.redirectUrl
+      window.location.href = `/order-confirmation?orderId=${data.orderId}`
     } catch {
       setApiError('Network error. Please check your connection and try again.')
       setLoading(false)
     }
+  }
+
+  if (authStatus === 'loading') {
+    return (
+      <PageShell step={step}>
+        <div style={{ textAlign: 'center', padding: '80px 24px', color: T.muted }}>
+          <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: '0.06em' }}>Verifying your session…</div>
+        </div>
+      </PageShell>
+    )
+  }
+
+  if (authStatus === 'unauthenticated') {
+    return (
+      <PageShell step={step}>
+        <div style={{ textAlign: 'center', padding: '100px 24px', maxWidth: 480, margin: '0 auto' }}>
+          <div style={{ fontSize: 48, marginBottom: 20 }}>🔒</div>
+          <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 32, fontStyle: 'italic', color: T.deep, marginBottom: 16, fontWeight: 700 }}>Authentication Required</h2>
+          <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, color: T.mid, lineHeight: 1.6, marginBottom: 32 }}>
+            To ensure the security of your transaction and order history, please sign in or register an Al Noor account.
+          </p>
+          <Link 
+            href="/login?callbackUrl=/checkout" 
+            style={{ 
+              display: 'inline-block', 
+              background: T.gold, 
+              color: '#fff', 
+              padding: '14px 40px', 
+              borderRadius: 2, 
+              fontSize: 13, 
+              fontWeight: 700, 
+              letterSpacing: '0.08em', 
+              textTransform: 'uppercase', 
+              textDecoration: 'none',
+              fontFamily: "'Raleway', sans-serif",
+              transition: 'background 0.2s'
+            }}
+          >
+            Sign In to Checkout
+          </Link>
+        </div>
+      </PageShell>
+    )
   }
 
   if (items.length === 0) {
@@ -174,7 +251,8 @@ export function CheckoutClient() {
   }
 
   return (
-    <PageShell step={step}>
+    <>
+      <PageShell step={step}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: isMobile ? '0 16px 80px' : '0 24px 60px', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 360px', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
 
         {/* ── Left column ── */}
@@ -256,9 +334,10 @@ export function CheckoutClient() {
 
                       <button
                         onClick={handleAddressSubmit}
-                        style={{ marginTop: 8, height: 48, padding: '0 40px', background: T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}
+                        disabled={checkingServiceability}
+                        style={{ marginTop: 8, height: 48, padding: '0 40px', background: checkingServiceability ? T.light : T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: checkingServiceability ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                       >
-                        Continue to Review →
+                        {checkingServiceability ? 'Verifying Address…' : 'Continue to Review →'}
                       </button>
                     </>
                   )}
@@ -272,9 +351,10 @@ export function CheckoutClient() {
                     <AddressForm address={address} setAddress={setAddress} errors={errors} isMobile={isMobile} />
                     <button
                       type="submit"
-                      style={{ marginTop: 8, height: 48, padding: '0 40px', background: T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', fontFamily: 'inherit' }}
+                      disabled={checkingServiceability}
+                      style={{ marginTop: 8, height: 48, padding: '0 40px', background: checkingServiceability ? T.light : T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: checkingServiceability ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                     >
-                      Continue to Review →
+                      {checkingServiceability ? 'Verifying Address…' : 'Continue to Review →'}
                     </button>
                   </SectionCard>
                 </form>
@@ -300,11 +380,21 @@ export function CheckoutClient() {
               <SectionCard title="2  Order Summary" style={{ marginTop: 16 }}>
                 {items.map(item => (
                   <div key={item.product.id} style={{ display: 'flex', gap: 16, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${T.borderLight}` }}>
-                    <div style={{ width: 72, height: 72, background: T.parchment, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1px solid ${T.borderLight}` }}>
-                      <WatchFace dial={item.product.dial} size={56} />
+                    <div style={{ width: 72, height: 72, background: T.parchment, borderRadius: 2, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1px solid ${T.borderLight}` }}>
+                      {item.product.images?.[0] ? (
+                        <Image
+                          src={toImageUrl(item.product.images[0])}
+                          alt={item.product.name}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                          sizes="72px"
+                        />
+                      ) : (
+                        <WatchFace dial={item.product.dial} size={56} />
+                      )}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 15, color: T.deep, lineHeight: 1.3, marginBottom: 2 }}>{item.product.name}</div>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, color: T.deep, lineHeight: 1.3, marginBottom: 2 }}>{item.product.name}</div>
                       <div style={{ fontSize: 11, color: T.light }}>Qty: {item.quantity} · {item.product.material}</div>
                     </div>
                     <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -322,15 +412,15 @@ export function CheckoutClient() {
               {/* Payment method */}
               <SectionCard title="3  Payment" style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', border: `2px solid ${T.gold}`, borderRadius: 4, background: '#FFFDF8', marginBottom: 16 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: 8, background: '#5f259f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 8, background: T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="white" opacity="0.2"/>
-                      <path d="M8 8h4.5C14.43 8 16 9.57 16 11.5S14.43 15 12.5 15H11v3H8V8zm3 5h1.5c.83 0 1.5-.67 1.5-1.5S13.33 10 12.5 10H11v3z" fill="white"/>
+                      <path d="M20 8h-3V6c0-1.1-.9-2-2-2H9c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zM9 6h6v2H9V6zm11 12H4v-8h16v8z" fill="white"/>
                     </svg>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.deep }}>PhonePe</div>
-                    <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>UPI · Cards · Net Banking · Wallets — all in one checkout</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: T.deep }}>Cash on Delivery (COD)</div>
+                    <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>Pay with cash or UPI upon delivery via Delhivery</div>
                   </div>
                   <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${T.gold}`, background: T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff' }} />
@@ -338,9 +428,8 @@ export function CheckoutClient() {
                 </div>
 
                 {[
-                  { name: 'Credit / Debit Card', sub: 'Available via PhonePe checkout' },
-                  { name: 'Net Banking', sub: 'All major banks supported' },
-                  { name: 'EMI', sub: 'No-cost EMI available on select cards' },
+                  { name: 'Credit / Debit Card', sub: 'Temporarily disabled' },
+                  { name: 'UPI / Net Banking', sub: 'Temporarily disabled' },
                 ].map(m => (
                   <div key={m.name} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', border: `1px solid ${T.borderLight}`, borderRadius: 4, marginBottom: 8, opacity: 0.55, cursor: 'not-allowed' }}>
                     <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${T.light}` }} />
@@ -360,14 +449,14 @@ export function CheckoutClient() {
                 <button
                   onClick={handlePlaceOrder}
                   disabled={loading}
-                  style={{ marginTop: 20, width: '100%', height: 52, background: loading ? T.muted : '#5f259f', color: '#fff', border: 'none', borderRadius: 4, fontSize: 15, fontWeight: 700, letterSpacing: '0.04em', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'background 0.2s', fontFamily: 'inherit' }}
+                  style={{ marginTop: 20, width: '100%', height: 52, background: loading ? T.muted : T.gold, color: '#fff', border: 'none', borderRadius: 4, fontSize: 15, fontWeight: 700, letterSpacing: '0.04em', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'background 0.2s', fontFamily: 'inherit' }}
                 >
-                  {loading ? <><Spinner /> Redirecting to PhonePe…</> : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Pay {formatPrice(total)} via PhonePe</>}
+                  {loading ? <><Spinner /> Placing Order…</> : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Place COD Order ({formatPrice(total)})</>}
                 </button>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, fontSize: 11, color: T.muted }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  Secured by PhonePe · 256-bit SSL encryption
+                  Delivery managed by Delhivery Express
                 </div>
               </SectionCard>
             </div>
@@ -407,8 +496,18 @@ export function CheckoutClient() {
             <div style={{ fontSize: 12, fontWeight: 600, color: T.muted, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 12 }}>Items in your order</div>
             {items.map(item => (
               <div key={item.product.id} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ width: 44, height: 44, background: T.parchment, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <WatchFace dial={item.product.dial} size={36} />
+                <div style={{ width: 44, height: 44, background: T.parchment, borderRadius: 2, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {item.product.images?.[0] ? (
+                    <Image
+                      src={toImageUrl(item.product.images[0])}
+                      alt={item.product.name}
+                      fill
+                      style={{ objectFit: 'cover' }}
+                      sizes="44px"
+                    />
+                  ) : (
+                    <WatchFace dial={item.product.dial} size={36} />
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: T.deep, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.product.name}</div>
@@ -427,6 +526,7 @@ export function CheckoutClient() {
         </div>
       </div>
     </PageShell>
+    </>
   )
 }
 

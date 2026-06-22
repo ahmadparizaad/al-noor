@@ -59,17 +59,19 @@ async function seedCatalogueDefaults() {
 export async function saveCatalogueList(type: CatalogueType, values: string[]) {
   await requireAdmin()
 
-  // Replace all rows for this type atomically
-  await db.delete(catalogueOptions).where(eq(catalogueOptions.type, type))
+  // Replace all rows for this type atomically in a transaction
+  await db.transaction(async (tx) => {
+    await tx.delete(catalogueOptions).where(eq(catalogueOptions.type, type))
 
-  if (values.length > 0) {
-    await db.insert(catalogueOptions).values(
-      values.map((value, i) => ({
-        id:        randomBytes(8).toString('hex'),
-        type,
-        value,
-        sortOrder: i,
-      }))
-    )
-  }
+    if (values.length > 0) {
+      await tx.insert(catalogueOptions).values(
+        values.map((value, i) => ({
+          id:        randomBytes(8).toString('hex'),
+          type,
+          value,
+          sortOrder: i,
+        }))
+      )
+    }
+  })
 }

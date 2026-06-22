@@ -1,6 +1,6 @@
-export type DialColor = 'Fumé Blue' | 'Champagne' | 'Onyx Black' | 'Grand Feu Ivory' | 'Sandstone'
-export type Category = 'Tourbillon' | 'Grand Feu Enamel' | 'Perpetual Calendar' | 'Minute Repeater' | 'Chronograph'
-export type Material = 'Grade-5 Titanium' | '18k Rose Gold' | '18k White Gold' | 'Platinum 950'
+export type DialColor = string
+export type Category = string
+export type Material = string
 export type BadgeType = 'new' | 'sale' | ''
 
 export interface Product {

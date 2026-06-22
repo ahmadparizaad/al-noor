@@ -35,7 +35,17 @@ const T = {
   red:         '#C0392B',
 }
 
-export function PDPClient({ product: initial, allProducts = [] }: { product: Product; allProducts?: Product[] }) {
+export function PDPClient({
+  product: initial,
+  allProducts = [],
+  materials = MATERIALS,
+  dialOptions = DIAL_OPTIONS,
+}: {
+  product: Product
+  allProducts?: Product[]
+  materials?: string[]
+  dialOptions?: string[]
+}) {
   const { isMobile, isTablet } = useBreakpoint()
   const [activeDial, setActiveDial]         = useState<DialColor>(initial.dial)
   const [activeMaterial, setActiveMaterial] = useState<Material>(initial.material)
@@ -99,7 +109,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
           <nav style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: isMobile ? 16 : 28, flexShrink: 0 }}>
             {!isMobile && <Link href="/" style={{ fontSize: 13, fontWeight: 500, color: T.mid, textDecoration: 'none' }}>Home</Link>}
             <Link href="/products" style={{ fontSize: 13, fontWeight: 500, color: T.mid, textDecoration: 'none' }}>{isMobile ? '← Watches' : 'All Watches'}</Link>
-            {!isMobile && <a href="mailto:enquire@alnoor.com" style={{ background: T.gold, color: T.ivory, padding: '8px 20px', borderRadius: 2, fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textDecoration: 'none' }}>Enquire</a>}
+            {!isMobile && <a href="https://wa.me/919067960830" target="_blank" rel="noopener noreferrer" style={{ background: T.gold, color: T.ivory, padding: '8px 20px', borderRadius: 2, fontSize: 12, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', textDecoration: 'none' }}>Enquire</a>}
           </nav>
         </div>
       </header>
@@ -157,7 +167,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
                   </button>
                 ))
               ) : (
-                DIAL_OPTIONS.map(dial => (
+                dialOptions.map(dial => (
                   <button
                     key={dial}
                     onClick={() => setActiveDial(dial)}
@@ -231,7 +241,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
                 Case Material <span style={{ fontWeight: 400, color: T.muted, marginLeft: 6 }}>— {activeMaterial}</span>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {MATERIALS.map(mat => (
+                {materials.map(mat => (
                   <button key={mat} onClick={() => { setActiveMaterial(mat); showToast(`Selected: ${mat}`) }}
                     style={{ padding: '7px 16px', borderRadius: 2, border: `1.5px solid ${activeMaterial === mat ? T.gold : T.border}`, fontSize: 12, fontWeight: activeMaterial === mat ? 600 : 500, color: activeMaterial === mat ? T.goldDark : T.mid, background: activeMaterial === mat ? T.goldPale : T.white, cursor: 'pointer', transition: 'all 0.15s' }}>
                     {mat}
@@ -246,7 +256,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
                 Dial Colour <span style={{ fontWeight: 400, color: T.muted, marginLeft: 6 }}>— {activeDial}</span>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {DIAL_OPTIONS.map(dial => (
+                {dialOptions.map(dial => (
                   <button key={dial} onClick={() => setActiveDial(dial)}
                     style={{ padding: '7px 16px', borderRadius: 2, border: `1.5px solid ${activeDial === dial ? T.gold : T.border}`, fontSize: 12, fontWeight: activeDial === dial ? 600 : 500, color: activeDial === dial ? T.goldDark : T.mid, background: activeDial === dial ? T.goldPale : T.white, cursor: 'pointer', transition: 'all 0.15s' }}>
                     {dial}
@@ -310,7 +320,10 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
               </button>
 
               <button
-                onClick={() => showToast('Redirecting to enquiry…')}
+                onClick={() => {
+                  const text = `Hello Al Noor, I would like to enquire about ${p.name} (Ref: ${p.ref}).`;
+                  window.open(`https://wa.me/919067960830?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+                }}
                 style={{ width: '100%', height: 44, background: T.parchment, color: T.goldDark, border: `1.5px solid ${T.gold}`, borderRadius: 2, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: 'pointer', marginBottom: 16, transition: 'all 0.2s' }}
               >
                 Enquire to Buy
@@ -321,7 +334,7 @@ export function PDPClient({ product: initial, allProducts = [] }: { product: Pro
               <div style={{ fontSize: 12, color: T.muted, lineHeight: 1.8 }}>
                 <strong style={{ color: T.deep }}>Sold by</strong> Al Noor Atelier<br />
                 <strong style={{ color: T.deep }}>Ships from</strong> Geneva, Switzerland<br />
-                <strong style={{ color: T.deep }}>Payment</strong> UPI · Cards · Bank Transfer<br />
+                <strong style={{ color: T.deep }}>Payment</strong> Cash on Delivery (COD) via Delhivery<br />
                 <strong style={{ color: T.deep }}>Warranty</strong> 5 Years — Al Noor Service
               </div>
 
