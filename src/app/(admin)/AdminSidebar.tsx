@@ -23,6 +23,7 @@ const NAV = [
   { href: '/admin/dashboard', label: 'Dashboard', accent: '#9E7F4A' },
   { href: '/admin/orders',    label: 'Orders',     accent: '#E8D5A3' },
   { href: '/admin/inventory', label: 'Inventory',  accent: '#2A2A2A' },
+  { href: '/admin/featured',  label: 'Featured Pieces', accent: '#9E7F4A' },
   { href: '/admin/customers', label: 'Customers',  accent: '#1a3a5c' },
   { href: '/admin/analytics', label: 'Analytics',  accent: '#C8A882' },
   { href: '/admin/settings',  label: 'Settings',   accent: '#8C7B65' },
