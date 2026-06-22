@@ -1,11 +1,12 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { products, orders, orderItems, users } from '@/lib/schema'
+import { products, orders, orderItems, users, featuredProducts } from '@/lib/schema'
 import { eq, desc, asc, sql, sum, count, and, gte, lte } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { AdminOrder, AdminCustomer, AdminProduct, RevenueMonth } from '@/types/admin'
+import { createDelhiveryShipment } from '@/lib/delhivery'
 
 async function requireAdmin() {
   const session = await auth()
@@ -176,11 +177,64 @@ export async function getAdminRevenue(): Promise<RevenueMonth[]> {
   }))
 }
 
-export async function updateOrderStatus(orderId: string, status: string) {
+export async function updateOrderStatus(orderId: string, status: string, trackingNumber?: string) {
   await requireAdmin()
-  await db.update(orders).set({ status: status as never, updatedAt: new Date() }).where(eq(orders.id, orderId))
+  
+  let trackingToSave = trackingNumber
+
+  const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1)
+
+  const isTransitioning = order && order.status !== 'processing' && order.status !== 'shipped'
+
+  if (order && (status === 'processing' || status === 'shipped') && isTransitioning && !order.trackingNumber && !trackingNumber) {
+    try {
+      const shippingAddr = JSON.parse(order.shippingAddress)
+
+      // Fetch order items to get product details
+      const items = await db
+        .select({
+          productName: products.name,
+          quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(eq(orderItems.orderId, orderId))
+
+      const productNames = items.map(i => `${i.productName} (x${i.quantity})`).join(', ')
+
+      const result = await createDelhiveryShipment({
+        orderId: order.id,
+        consigneeName: shippingAddr.fullName,
+        consigneePhone: shippingAddr.phone,
+        consigneeAddress: `${shippingAddr.line1} ${shippingAddr.line2 || ''}`,
+        consigneePincode: shippingAddr.pincode,
+        consigneeCity: shippingAddr.city,
+        consigneeState: shippingAddr.state,
+        totalAmount: Number(order.totalInr),
+        paymentType: order.paymentStatus === 'paid' ? 'Prepaid' : 'COD',
+        productName: productNames || 'Luxury Watch',
+      })
+
+      if (result.success && result.waybill) {
+        trackingToSave = result.waybill
+      } else {
+        console.error('Failed to create Delhivery shipment:', result.error)
+      }
+    } catch (err) {
+      console.error('Error during automatic Delhivery shipment creation:', err)
+    }
+  }
+
+  await db.update(orders).set({
+    status: status as never,
+    ...(trackingToSave && { trackingNumber: trackingToSave }),
+    updatedAt: new Date()
+  }).where(eq(orders.id, orderId))
+
   revalidatePath('/admin/orders')
   revalidatePath('/admin/dashboard')
+
+  return { success: true, trackingNumber: trackingToSave }
 }
 
 export async function updateProductStock(productId: string, stock: number) {
@@ -267,3 +321,102 @@ export async function deleteProduct(productId: string): Promise<void> {
   revalidatePath('/admin/inventory')
   revalidatePath('/products')
 }
+
+export interface AdminFeaturedProduct {
+  position: number
+  productId: string | null
+  productName?: string
+  productRef?: string
+  productCategory?: string
+  productMaterial?: string
+  productDial?: string
+  productPrice?: number
+  productImage?: string
+  isActive?: boolean
+}
+
+export async function getAdminFeaturedProducts(): Promise<AdminFeaturedProduct[]> {
+  await requireAdmin()
+
+  // Get current featured products
+  const rows = await db
+    .select({
+      position: featuredProducts.position,
+      productId: featuredProducts.productId,
+      productName: products.name,
+      productSpecs: products.specs,
+      productCategory: products.category,
+      productPrice: products.priceInr,
+      productImages: products.images,
+      isActive: products.isActive,
+    })
+    .from(featuredProducts)
+    .leftJoin(products, eq(featuredProducts.productId, products.id))
+    .orderBy(asc(featuredProducts.position))
+
+  // Create slots for 1, 2, 3, 4
+  const slots: AdminFeaturedProduct[] = Array.from({ length: 4 }, (_, i) => ({
+    position: i + 1,
+    productId: null,
+  }))
+
+  for (const row of rows) {
+    if (row.position >= 1 && row.position <= 4) {
+      let specs: Record<string, string> = {}
+      try {
+        if (row.productSpecs) specs = JSON.parse(row.productSpecs)
+      } catch { /* empty */ }
+
+      slots[row.position - 1] = {
+        position: row.position,
+        productId: row.productId,
+        productName: row.productName ?? undefined,
+        productRef: specs.Reference ?? undefined,
+        productCategory: row.productCategory ?? undefined,
+        productMaterial: specs.Material ?? undefined,
+        productDial: specs['Dial Colour'] ?? undefined,
+        productPrice: row.productPrice ? Number(row.productPrice) : undefined,
+        productImage: row.productImages?.[0] ?? undefined,
+        isActive: row.isActive ?? undefined,
+      }
+    }
+  }
+
+  return slots
+}
+
+export async function saveFeaturedProduct(position: number, productId: string | null): Promise<void> {
+  await requireAdmin()
+
+  if (position < 1 || position > 4) {
+    throw new Error('Invalid position')
+  }
+
+  if (productId === null) {
+    // Clear the slot
+    await db.delete(featuredProducts).where(eq(featuredProducts.position, position))
+  } else {
+    // Upsert the slot
+    const existing = await db
+      .select()
+      .from(featuredProducts)
+      .where(eq(featuredProducts.position, position))
+      .limit(1)
+
+    if (existing.length > 0) {
+      await db
+        .update(featuredProducts)
+        .set({ productId, updatedAt: new Date() })
+        .where(eq(featuredProducts.position, position))
+    } else {
+      await db.insert(featuredProducts).values({
+        position,
+        productId,
+      })
+    }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/admin/featured')
+}
+

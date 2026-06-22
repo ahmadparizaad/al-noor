@@ -1,8 +1,8 @@
 'use server'
 
 import { db } from '@/lib/db'
-import { products } from '@/lib/schema'
-import { eq, asc, desc, and, ilike, gte, lte, sql } from 'drizzle-orm'
+import { products, featuredProducts } from '@/lib/schema'
+import { eq, asc, desc, and, ilike, gte, lte, sql, notInArray } from 'drizzle-orm'
 
 export interface StoreProduct {
   id: string
@@ -88,13 +88,36 @@ export async function getProductBySlug(slug: string): Promise<StoreProduct | nul
 
 export async function getFeaturedProducts(limit = 4): Promise<StoreProduct[]> {
   const rows = await db
-    .select()
-    .from(products)
+    .select({
+      product: products,
+      position: featuredProducts.position,
+    })
+    .from(featuredProducts)
+    .innerJoin(products, eq(featuredProducts.productId, products.id))
     .where(eq(products.isActive, true))
-    .orderBy(desc(products.createdAt))
+    .orderBy(asc(featuredProducts.position))
     .limit(limit)
 
-  return rows.map(parseProduct)
+  const featured = rows.map(r => parseProduct(r.product))
+
+  if (featured.length < limit) {
+    const excludedIds = featured.map(p => p.id)
+    const conditions = [eq(products.isActive, true)]
+    if (excludedIds.length > 0) {
+      conditions.push(notInArray(products.id, excludedIds))
+    }
+
+    const extraRows = await db
+      .select()
+      .from(products)
+      .where(and(...conditions))
+      .orderBy(desc(products.createdAt))
+      .limit(limit - featured.length)
+
+    featured.push(...extraRows.map(parseProduct))
+  }
+
+  return featured.slice(0, limit)
 }
 
 export async function getProductsAllIds(): Promise<string[]> {

@@ -91,3 +91,10 @@ export const orderItems = pgTable('order_items', {
   quantity: integer('quantity').notNull(),
   priceInr: decimal('price_inr', { precision: 10, scale: 2 }).notNull(),
 })
+
+export const featuredProducts = pgTable('featured_products', {
+  position: integer('position').primaryKey(), // 1, 2, 3, 4
+  productId: text('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
