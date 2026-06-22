@@ -1,0 +1,387 @@
+import { db } from '@/lib/db'
+import { orders } from '@/lib/schema'
+import { eq } from 'drizzle-orm'
+
+const DELHI_STAGING_URL = 'https://staging-express.delhivery.com'
+const DELHI_PROD_URL = 'https://track.delhivery.com'
+
+function getDelhiUrl(path: string) {
+  const env = process.env.DELHIVERY_ENV || 'staging'
+  const baseUrl = env === 'production' ? DELHI_PROD_URL : DELHI_STAGING_URL
+  return `${baseUrl}${path}`
+}
+
+function getDelhiToken() {
+  return process.env.DELHIVERY_API_TOKEN || 'mock_delhivery_api_token'
+}
+
+function isMockMode() {
+  const token = getDelhiToken()
+  return token === 'mock_delhivery_api_token' || token.startsWith('mock')
+}
+
+// Al Noor Luxury default warehouse/pickup location (Delhi/NCR area)
+export const DEFAULT_PICKUP_LOCATION = {
+  name: 'Al Noor Luxury Atelier',
+  add: 'Plot No. 42, Sector 18, Udyog Vihar Phase IV',
+  pin: '122015',
+  city: 'Gurugram',
+  state: 'Haryana',
+  country: 'India',
+  phone: '9876543210',
+}
+
+export interface PincodeServiceabilityResult {
+  isServiceable: boolean
+  isCod: boolean
+  isPrepaid: boolean
+  district?: string
+  state?: string
+  estimatedDeliveryDays?: string
+}
+
+/**
+ * Check if a pincode is serviceable by Delhivery
+ */
+export async function checkPincodeServiceability(pincode: string): Promise<PincodeServiceabilityResult> {
+  if (!/^\d{6}$/.test(pincode)) {
+    return { isServiceable: false, isCod: false, isPrepaid: false }
+  }
+
+  if (isMockMode()) {
+    // Standard mock behavior: Pincodes starting with 9 are non-serviceable for testing
+    if (pincode.startsWith('9')) {
+      return { isServiceable: false, isCod: false, isPrepaid: false }
+    }
+    // All other pincodes are serviceable
+    return {
+      isServiceable: true,
+      isCod: true,
+      isPrepaid: true,
+      district: pincode.startsWith('11') ? 'Delhi' : pincode.startsWith('40') ? 'Mumbai' : 'Bengaluru',
+      state: pincode.startsWith('11') ? 'Delhi' : pincode.startsWith('40') ? 'Maharashtra' : 'Karnataka',
+      estimatedDeliveryDays: '2-4 days',
+    }
+  }
+
+  try {
+    const token = getDelhiToken()
+    const url = getDelhiUrl(`/c/api/pin-codes/json/?filter_codes=${pincode}`)
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Accept': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error(`Delhivery Pincode serviceability API error: ${response.status} ${response.statusText}`)
+      return { isServiceable: false, isCod: false, isPrepaid: false }
+    }
+
+    const data = await response.json()
+    const deliveryCodes = data?.delivery_codes || []
+
+    if (deliveryCodes.length === 0) {
+      return { isServiceable: false, isCod: false, isPrepaid: false }
+    }
+
+    const postalCodeInfo = deliveryCodes[0]?.postal_code || deliveryCodes[0]?.pin_code
+    if (!postalCodeInfo) {
+      return { isServiceable: false, isCod: false, isPrepaid: false }
+    }
+
+    // Delhivery API can return string 'Y'/'N' or boolean
+    const isServiceable = postalCodeInfo.is_serviceable === true || postalCodeInfo.is_serviceable === 'Y'
+    const isCod = postalCodeInfo.cod === true || postalCodeInfo.cod === 'Y' || postalCodeInfo.is_cod_serviceable === true
+    const isPrepaid = postalCodeInfo.prepaid === true || postalCodeInfo.prepaid === 'Y' || postalCodeInfo.is_prepaid_serviceable === true
+
+    return {
+      isServiceable,
+      isCod,
+      isPrepaid,
+      district: postalCodeInfo.district || postalCodeInfo.city,
+      state: postalCodeInfo.state,
+      estimatedDeliveryDays: postalCodeInfo.d_time || '3-5 days',
+    }
+  } catch (error) {
+    console.error('Error checking Delhivery pincode serviceability:', error)
+    return { isServiceable: false, isCod: false, isPrepaid: false }
+  }
+}
+
+export interface CreateShipmentParams {
+  orderId: string
+  consigneeName: string
+  consigneePhone: string
+  consigneeAddress: string
+  consigneePincode: string
+  consigneeCity: string
+  consigneeState: string
+  consigneeCountry?: string
+  totalAmount: number
+  paymentType: 'Prepaid' | 'COD'
+  weightKg?: number
+  lengthCm?: number
+  breadthCm?: number
+  heightCm?: number
+  productName?: string
+}
+
+export interface CreateShipmentResult {
+  success: boolean
+  waybill?: string
+  error?: string
+  rawResponse?: unknown
+}
+
+/**
+ * Register a shipment on Delhivery and get a Waybill / tracking number
+ */
+export async function createDelhiveryShipment(params: CreateShipmentParams): Promise<CreateShipmentResult> {
+  const payload = {
+    shipments: [
+      {
+        order: params.orderId,
+        consignee_name: params.consigneeName,
+        consignee_phone: params.consigneePhone,
+        consignee_address: params.consigneeAddress,
+        consignee_pincode: params.consigneePincode,
+        consignee_city: params.consigneeCity,
+        consignee_state: params.consigneeState,
+        consignee_country: params.consigneeCountry || 'India',
+        package_type: params.paymentType, // "Prepaid" or "COD"
+        weight: params.weightKg || 0.5,
+        length: params.lengthCm || 15,
+        breadth: params.breadthCm || 15,
+        height: params.heightCm || 10,
+        cod_amount: params.paymentType === 'COD' ? params.totalAmount : 0,
+        product: params.productName || 'Luxury Watch',
+        seller_name: DEFAULT_PICKUP_LOCATION.name,
+        seller_address: DEFAULT_PICKUP_LOCATION.add,
+        seller_phone: DEFAULT_PICKUP_LOCATION.phone,
+      }
+    ],
+    pickup_location: {
+      name: DEFAULT_PICKUP_LOCATION.name,
+      add: DEFAULT_PICKUP_LOCATION.add,
+      pin: DEFAULT_PICKUP_LOCATION.pin,
+      city: DEFAULT_PICKUP_LOCATION.city,
+      state: DEFAULT_PICKUP_LOCATION.state,
+      country: DEFAULT_PICKUP_LOCATION.country,
+      phone: DEFAULT_PICKUP_LOCATION.phone,
+    }
+  }
+
+  if (isMockMode()) {
+    const randomDigits = Math.floor(1000000000 + Math.random() * 9000000000)
+    const waybill = `DELH${randomDigits}`
+    
+    // Save waybill to the orders database asynchronously
+    await db.update(orders)
+      .set({ trackingNumber: waybill, status: 'processing', updatedAt: new Date() })
+      .where(eq(orders.id, params.orderId))
+
+    return {
+      success: true,
+      waybill,
+      rawResponse: { mock: true, order: params.orderId }
+    }
+  }
+
+  try {
+    const token = getDelhiToken()
+    const url = getDelhiUrl('/api/cmu/create.json')
+
+    const bodyParams = new URLSearchParams()
+    bodyParams.append('format', 'json')
+    bodyParams.append('data', JSON.stringify(payload))
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+      },
+      body: bodyParams.toString(),
+    })
+
+    if (!response.ok) {
+      console.error(`Delhivery CMU API error: ${response.status} ${response.statusText}`)
+      return { success: false, error: `Delhivery server returned status ${response.status}` }
+    }
+
+    const data = await response.json()
+    
+    // Delhivery response structure verification
+    const shipmentResponse = data?.shipment_response?.[0] || data?.packages?.[0]
+    
+    if (data?.success === false || (shipmentResponse && shipmentResponse.status === 'Failure')) {
+      const errorMsg = shipmentResponse?.remarks?.[0] || data?.error || 'Unknown error occurred on Delhivery'
+      return { success: false, error: errorMsg, rawResponse: data }
+    }
+
+    const waybill = shipmentResponse?.waybill || shipmentResponse?.awb
+    
+    if (!waybill) {
+      return { success: false, error: 'No waybill found in response', rawResponse: data }
+    }
+
+    // Save waybill/tracking number to orders database
+    await db.update(orders)
+      .set({ trackingNumber: waybill, status: 'processing', updatedAt: new Date() })
+      .where(eq(orders.id, params.orderId))
+
+    return {
+      success: true,
+      waybill,
+      rawResponse: data
+    }
+  } catch (error) {
+    console.error('Error creating Delhivery shipment:', error)
+    const errorMsg = error instanceof Error ? error.message : 'Network error'
+    return { success: false, error: errorMsg }
+  }
+}
+
+export interface TrackingEvent {
+  status: string
+  location: string
+  timestamp: string
+  note?: string
+}
+
+export interface TrackingResult {
+  waybill: string
+  status: string
+  statusDate?: string
+  scans: TrackingEvent[]
+}
+
+/**
+ * Fetch package tracking information from Delhivery
+ */
+export async function trackDelhiveryShipment(waybill: string): Promise<TrackingResult | null> {
+  if (!waybill) return null
+
+  if (isMockMode()) {
+    // Generate realistic simulated tracking history for demo purposes
+    const now = new Date()
+    const trackingEvents: TrackingEvent[] = [
+      {
+        status: 'Manifest Created',
+        location: 'Gurugram, Haryana',
+        timestamp: new Date(now.getTime() - 24 * 3600_000).toISOString(),
+        note: 'Shipment data received, waiting for pickup',
+      },
+    ]
+
+    // Add extra statuses depending on the prefix/suffix of the mock waybill to simulate in-transit/delivered states
+    const lastDigit = parseInt(waybill.slice(-1)) || 0
+    
+    if (lastDigit >= 3) {
+      trackingEvents.push({
+        status: 'In Transit',
+        location: 'Gurugram Warehouse, Haryana',
+        timestamp: new Date(now.getTime() - 18 * 3600_000).toISOString(),
+        note: 'Package picked up by Delhivery and in transit',
+      })
+    }
+    
+    if (lastDigit >= 6) {
+      trackingEvents.push({
+        status: 'Reached Delivery Center',
+        location: 'Destination Hub',
+        timestamp: new Date(now.getTime() - 8 * 3600_000).toISOString(),
+        note: 'Package arrived at delivery center',
+      })
+    }
+
+    if (lastDigit >= 8) {
+      trackingEvents.push({
+        status: 'Out For Delivery',
+        location: 'Destination Hub',
+        timestamp: new Date(now.getTime() - 3 * 3600_000).toISOString(),
+        note: 'Package is out with courier partner for delivery',
+      })
+    }
+
+    if (lastDigit === 9) {
+      trackingEvents.push({
+        status: 'Delivered',
+        location: 'Consignee Address',
+        timestamp: new Date(now.getTime() - 1 * 3600_000).toISOString(),
+        note: 'Package delivered successfully. Signed by customer.',
+      })
+    }
+
+    return {
+      waybill,
+      status: trackingEvents[trackingEvents.length - 1].status,
+      statusDate: trackingEvents[trackingEvents.length - 1].timestamp,
+      scans: trackingEvents,
+    }
+  }
+
+  try {
+    const token = getDelhiToken()
+    const url = getDelhiUrl(`/api/v1/packages/json/?waybill=${waybill}`)
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Accept': 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      console.error(`Delhivery Tracking API error: ${response.status} ${response.statusText}`)
+      return null
+    }
+
+    const data = await response.json()
+    
+    // Parse Delhivery tracking response structure
+    const trackingData = data?.ShipmentData?.[0]?.Shipment || data?.tracking_data || data?.[0]
+    
+    if (!trackingData) {
+      return null
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scans: TrackingEvent[] = (trackingData.Scans || trackingData.scans || []).map((scan: any) => {
+      const scanDetail = scan.ScanDetail || scan
+      return {
+        status: scanDetail.status || scanDetail.Scan || scanDetail.Instructions,
+        location: scanDetail.ScannedLocation || scanDetail.location || scanDetail.ScanLocation,
+        timestamp: scanDetail.ScanDateTime || scanDetail.date || scanDetail.ScanDate,
+        note: scanDetail.Instructions || scanDetail.details || scanDetail.Comment,
+      }
+    })
+
+    const statusObj = trackingData.Status || trackingData.status
+    const status = statusObj?.Status || statusObj?.status || trackingData.Status?.status || 'Unknown'
+    const statusDate = statusObj?.StatusDateTime || statusObj?.status_date || trackingData.Status?.status_date
+
+    return {
+      waybill,
+      status,
+      statusDate,
+      scans: scans.length > 0 ? scans : [
+        {
+          status: status,
+          location: trackingData.Destination || 'In Transit',
+          timestamp: statusDate || new Date().toISOString(),
+          note: trackingData.Instructions || 'Package status updated',
+        }
+      ],
+    }
+  } catch (error) {
+    console.error('Error tracking Delhivery shipment:', error)
+    return null
+  }
+}

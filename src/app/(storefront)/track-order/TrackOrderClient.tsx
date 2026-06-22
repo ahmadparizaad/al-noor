@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { formatPrice } from '@/lib/products-data'
 
 const T = {
   ivory:       '#FAF7F2',
@@ -61,7 +62,7 @@ function statusIndex(status: OrderStatus): number {
   return idx === -1 ? (status === 'pending' ? 0 : 0) : idx
 }
 
-// Mock order for demo (used when DB not connected)
+// Mock order for demo (used when DB not connected or as fallback)
 function mockOrder(orderId: string): OrderData {
   const created    = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
   const estimated  = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000) // 8 days from now
@@ -71,7 +72,7 @@ function mockOrder(orderId: string): OrderData {
     status:            'shipped',
     paymentStatus:     'paid',
     totalInr:          '28500',
-    trackingNumber:    'DHL-AL' + orderId.slice(0, 8).toUpperCase(),
+    trackingNumber:    'DELH' + orderId.slice(0, 8).toUpperCase(),
     createdAt:         created.toISOString(),
     estimatedDelivery: estimated.toISOString(),
     product: {
@@ -86,9 +87,9 @@ function mockOrder(orderId: string): OrderData {
       pincode: '400001',
     },
     events: [
-      { status: 'Shipped',            location: 'Geneva, Switzerland', timestamp: new Date(Date.now() - 18 * 3600_000).toISOString(), note: 'Picked up by DHL Express' },
-      { status: 'In Transit',         location: 'Dubai, UAE',          timestamp: new Date(Date.now() - 10 * 3600_000).toISOString(), note: 'Transit hub — on schedule' },
-      { status: 'Customs Cleared',    location: 'Mumbai, India',       timestamp: new Date(Date.now() - 4  * 3600_000).toISOString(), note: 'Customs clearance complete' },
+      { status: 'Manifest Created',   location: 'Gurugram, Haryana',   timestamp: new Date(Date.now() - 18 * 3600_000).toISOString(), note: 'Shipment data received, waiting for pickup' },
+      { status: 'Shipped',            location: 'Gurugram Warehouse',  timestamp: new Date(Date.now() - 15 * 3600_000).toISOString(), note: 'Picked up by Delhivery' },
+      { status: 'In Transit',         location: 'Delhi Hub',           timestamp: new Date(Date.now() - 10 * 3600_000).toISOString(), note: 'Transit hub — on schedule' },
       { status: 'Out for Delivery',   location: 'Mumbai, Maharashtra', timestamp: new Date(Date.now() - 1  * 3600_000).toISOString(), note: 'With delivery partner' },
     ],
   }
@@ -162,12 +163,85 @@ function SearchForm({ onSearch }: { onSearch: (id: string) => void }) {
 
 // ── Main tracking view ──
 function TrackingView({ orderId }: { orderId: string }) {
-  // In production this would fetch from /api/orders/[id]
-  // For now use mock data so the UI is always demonstrable
-  const [order] = useState<OrderData>(() => mockOrder(orderId))
+  const [order, setOrder] = useState<OrderData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [inputId, setInputId]   = useState(orderId)
-  const [searching, setSearching] = useState(false)
   const { isMobile } = useBreakpoint()
+
+  useEffect(() => {
+    let active = true
+    
+    fetch(`/api/orders/${orderId}`, {
+      headers: {
+        'x-guest-token': orderId,
+      }
+    })
+      .then(async res => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || 'Failed to fetch order details')
+        }
+        return res.json()
+      })
+      .then(data => {
+        if (active) {
+          setOrder(data)
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        if (active) {
+          console.error('Error fetching order tracking info:', err)
+          if (process.env.NODE_ENV === 'development' || orderId.startsWith('demo')) {
+            setOrder(mockOrder(orderId))
+            setLoading(false)
+          } else {
+            setError(err.message || 'Order not found')
+            setLoading(false)
+          }
+        }
+      })
+
+    return () => { active = false }
+  }, [orderId])
+
+  if (loading) {
+    return (
+      <div style={{ maxWidth: 860, margin: '80px auto', padding: '0 24px', textAlign: 'center', color: T.muted }}>
+        <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: '0.06em' }}>
+          Fetching live tracking updates…
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !order) {
+    return (
+      <div style={{ maxWidth: 560, margin: '60px auto', padding: '0 24px', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+        <h2 style={{ fontFamily: "'Bodoni Moda', serif", fontSize: 26, fontStyle: 'italic', color: T.deep, marginBottom: 8 }}>Order Not Found</h2>
+        <p style={{ fontSize: 14, color: T.red, marginBottom: 32, lineHeight: 1.6 }}>
+          {error || 'We could not retrieve details for this order. Please verify your Order ID.'}
+        </p>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+          <input
+            type="text"
+            value={inputId}
+            onChange={e => setInputId(e.target.value)}
+            placeholder="Order ID"
+            style={{ flex: 1, height: 40, border: `1.5px solid ${T.border}`, borderRadius: 2, padding: '0 14px', fontSize: 13, color: T.deep, background: T.white, outline: 'none', fontFamily: 'inherit' }}
+          />
+          <button
+            onClick={() => window.location.href = `/track-order?orderId=${inputId.trim()}`}
+            style={{ height: 40, padding: '0 24px', background: T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+          >
+            Track
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const currentStep = statusIndex(order.status)
   const isCancelled = order.status === 'cancelled'
@@ -204,8 +278,8 @@ function TrackingView({ orderId }: { orderId: string }) {
             <div style={{ fontSize: 13, color: T.deep, marginTop: 2 }}>{fmtDateShort(order.createdAt)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Amount Paid</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: T.deep, marginTop: 2 }}>₹{Number(order.totalInr).toLocaleString('en-IN')}</div>
+            <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{order.paymentStatus?.includes('cod') ? 'COD Amount' : 'Amount Paid'}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: T.deep, marginTop: 2 }}>{formatPrice(Number(order.totalInr))}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: isCancelled ? T.red : statusColor(order.status), display: 'inline-block', flexShrink: 0 }} />
@@ -227,7 +301,7 @@ function TrackingView({ orderId }: { orderId: string }) {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.gold }}>Al Noor</div>
-            <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 16, color: T.deep, marginTop: 2 }}>{order.product.name}</div>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, color: T.deep, marginTop: 2 }}>{order.product.name}</div>
             <div style={{ fontSize: 11, color: T.light, marginTop: 2 }}>{order.product.ref}</div>
           </div>
           {!isMobile && (
@@ -303,7 +377,7 @@ function TrackingView({ orderId }: { orderId: string }) {
           <span style={{ fontSize: 14, fontWeight: 700, color: T.deep }}>Shipment Updates</span>
           {order.trackingNumber && (
             <span style={{ fontSize: 12, color: T.muted }}>
-              via DHL Express · <span style={{ fontFamily: 'monospace', color: T.gold, fontWeight: 600 }}>{order.trackingNumber}</span>
+              via Delhivery · <span style={{ fontFamily: 'monospace', color: T.gold, fontWeight: 600 }}>{order.trackingNumber}</span>
             </span>
           )}
         </div>
@@ -359,8 +433,9 @@ function TrackingView({ orderId }: { orderId: string }) {
         <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, padding: '18px 20px' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: T.deep, marginBottom: 14 }}>Delivery Details</div>
           {[
-            { label: 'Courier',    value: 'DHL Express' },
-            { label: 'Service',    value: 'Insured Express International' },
+            { label: 'Courier',    value: 'Delhivery' },
+            { label: 'Service',    value: 'Delhivery Express' },
+            { label: 'Payment Mode', value: order.paymentStatus?.includes('cod') ? 'Cash on Delivery (COD)' : 'Prepaid' },
             { label: 'Packaging',  value: 'Discreet, signature required' },
             { label: 'Insurance',  value: 'Full declared value covered' },
           ].map(row => (
@@ -418,7 +493,7 @@ function TrackOrderInner() {
   if (!orderId) {
     return <SearchForm onSearch={id => setOrderId(id)} />
   }
-  return <TrackingView orderId={orderId} />
+  return <TrackingView key={orderId} orderId={orderId} />
 }
 
 export function TrackOrderClient() {

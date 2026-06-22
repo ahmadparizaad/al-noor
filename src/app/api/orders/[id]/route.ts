@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { orders } from '@/lib/schema'
+import { orders, orderItems, products } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
+import { trackDelhiveryShipment } from '@/lib/delhivery'
 
 export async function GET(
   req: NextRequest,
@@ -33,14 +34,115 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
   }
 
-  const shipped = order.status === 'shipped' || order.status === 'delivered'
+  // Fetch address details
+  let address = { name: 'Valued Customer', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' }
+  try {
+    const shippingAddr = JSON.parse(order.shippingAddress)
+    address = {
+      name: shippingAddr.fullName || 'Valued Customer',
+      city: shippingAddr.city || '',
+      state: shippingAddr.state || '',
+      pincode: shippingAddr.pincode || '',
+    }
+  } catch (e) {
+    console.error('Failed to parse order shipping address:', e)
+  }
+
+  // Fetch product details
+  const dbItems = await db
+    .select({
+      name: products.name,
+      specs: products.specs,
+    })
+    .from(orderItems)
+    .leftJoin(products, eq(orderItems.productId, products.id))
+    .where(eq(orderItems.orderId, id))
+
+  const firstItem = dbItems[0]
+  let ref = 'AN-001-AT'
+  let dial = 'Onyx Black'
+  try {
+    const specsObj = JSON.parse(firstItem?.specs || '{}')
+    ref = specsObj.Reference || ref
+    dial = specsObj['Dial Colour'] || dial
+  } catch (e) {
+    console.error('Failed to parse product specs:', e)
+  }
+
+  const product = {
+    name: firstItem?.name || 'Al Noor Luxury Timepiece',
+    ref,
+    dial,
+  }
+
+  // Default fallback estimated delivery (7 days after order date)
+  const estimatedDelivery = new Date(order.createdAt.getTime() + 7 * 24 * 3600 * 1000).toISOString()
+
+  let events: Array<{ status: string; location: string; timestamp: string; note?: string }> = []
+  
+  // If order is shipped/processing and has a tracking number, fetch live tracking updates
+  if (order.trackingNumber) {
+    try {
+      const trackingInfo = await trackDelhiveryShipment(order.trackingNumber)
+      if (trackingInfo && trackingInfo.scans) {
+        events = trackingInfo.scans.map(scan => ({
+          status: scan.status,
+          location: scan.location,
+          timestamp: scan.timestamp,
+          note: scan.note,
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to fetch live Delhivery tracking info:', err)
+    }
+  }
+
+  // If no tracking events found but order status is confirmed, processing or shipped, add initial steps
+  if (events.length === 0) {
+    if (order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
+      events.push({
+        status: 'Order Confirmed',
+        location: 'Al Noor Atelier, Gurugram',
+        timestamp: order.createdAt.toISOString(),
+        note: 'Order verification complete. Preparing timepiece in atelier.',
+      })
+    }
+    if (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
+      events.push({
+        status: 'Atelier Processing',
+        location: 'Al Noor Atelier, Gurugram',
+        timestamp: new Date(order.createdAt.getTime() + 2 * 3600 * 1000).toISOString(),
+        note: 'Timepiece undergo regulatory inspection and packing.',
+      })
+    }
+    if (order.status === 'shipped' || order.status === 'delivered') {
+      events.push({
+        status: 'Shipped',
+        location: 'Delhi NCR Hub',
+        timestamp: new Date(order.createdAt.getTime() + 24 * 3600 * 1000).toISOString(),
+        note: `Dispatched via Delhivery Express. Waybill: ${order.trackingNumber}`,
+      })
+    }
+    if (order.status === 'delivered') {
+      events.push({
+        status: 'Delivered',
+        location: address.city,
+        timestamp: new Date(order.createdAt.getTime() + 72 * 3600 * 1000).toISOString(),
+        note: 'Shipment delivered to customer.',
+      })
+    }
+  }
 
   return NextResponse.json({
-    id:            order.id,
-    status:        order.status,
-    paymentStatus: order.paymentStatus,
-    totalInr:      order.totalInr,
-    createdAt:     order.createdAt,
-    ...(shipped && { trackingNumber: order.trackingNumber }),
+    id:                order.id,
+    status:            order.status,
+    paymentStatus:     order.paymentStatus,
+    totalInr:          order.totalInr,
+    trackingNumber:    order.trackingNumber,
+    createdAt:         order.createdAt.toISOString(),
+    estimatedDelivery,
+    product,
+    address,
+    events,
   })
 }
