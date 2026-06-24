@@ -170,7 +170,7 @@ export async function getAdminRevenue(): Promise<RevenueMonth[]> {
     ORDER BY month_start ASC
   `)
 
-  return (rows as unknown as Array<{ month: string; revenue_inr: string; orders_count: string }>).map(r => ({
+  return (rows.rows as unknown as Array<{ month: string; revenue_inr: string; orders_count: string }>).map(r => ({
     month: r.month.trim(),
     revenueInr: Number(r.revenue_inr),
     ordersCount: Number(r.orders_count),
