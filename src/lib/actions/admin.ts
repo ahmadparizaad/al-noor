@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { AdminOrder, AdminCustomer, AdminProduct, RevenueMonth } from '@/types/admin'
 import { createDelhiveryShipment } from '@/lib/delhivery'
-import { sendWhatsAppOrderStatusUpdate } from '@/lib/whatsapp'
+import { notifyOrderStatusChanged } from '@/lib/notifications'
 
 async function requireAdmin() {
   const session = await auth()
@@ -245,23 +245,14 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
     updatedAt: new Date()
   }).where(eq(orders.id, orderId))
 
-  // Trigger WhatsApp notification for order status update asynchronously
-  try {
-    const shippingAddr = JSON.parse(order.shippingAddress)
-    const phoneToNotify = shippingAddr?.phone
-    if (phoneToNotify) {
-      // Run as promise so it doesn't block the UI
-      sendWhatsAppOrderStatusUpdate(phoneToNotify, {
-        id: orderId,
-        status: status,
-        trackingNumber: trackingToSave || order.trackingNumber
-      }).catch(err => {
-        console.error('[admin-order] Failed to send order status WhatsApp:', err)
-      })
-    }
-  } catch (err) {
-    console.error('[admin-order] Failed to parse shipping address for WhatsApp notification:', err)
-  }
+  // Trigger order status update notifications asynchronously (both Email and WhatsApp)
+  notifyOrderStatusChanged(
+    orderId,
+    status as any,
+    trackingToSave || order.trackingNumber
+  ).catch(err => {
+    console.error('[admin-order] Failed to dispatch order status notifications:', err)
+  })
 
   revalidatePath('/admin/orders')
   revalidatePath('/admin/dashboard')

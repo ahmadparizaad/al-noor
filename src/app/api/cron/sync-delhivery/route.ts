@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { orders } from '@/lib/schema'
 import { and, eq, isNotNull, or } from 'drizzle-orm'
 import { trackDelhiveryShipment } from '@/lib/delhivery'
+import { notifyOrderStatusChanged } from '@/lib/notifications'
 
 function isAuthorized(authHeader: string | null): boolean {
   const secret = process.env.CRON_SECRET
@@ -66,6 +67,10 @@ export async function GET(req: NextRequest) {
           updatedAt: new Date(),
         })
         .where(eq(orders.id, order.id))
+
+      if (mapped === 'delivered' || mapped === 'cancelled') {
+        await notifyOrderStatusChanged(order.id, mapped)
+      }
 
       results.updated++
     } catch (err) {

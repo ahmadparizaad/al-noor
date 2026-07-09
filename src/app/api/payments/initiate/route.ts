@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { orders, orderItems, products } from '@/lib/schema'
 import { inArray, sql, eq } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
+import { notifyOrderPlaced } from '@/lib/notifications'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -48,6 +49,8 @@ export async function POST(req: NextRequest) {
 
   const transactionId = `AL${randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`
   const orderId = randomUUID()
+  // This route currently only creates cash-on-delivery orders (no prepaid path is wired up yet).
+  const orderPaymentStatus = 'cod_pending'
 
   // Create order, order items and decrement stock in a transaction to prevent foreign key violations
   await db.transaction(async (tx) => {
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
       totalInr: totalInr.toFixed(2),
       shippingAddress: JSON.stringify(address),
       phonePeTransactionId: transactionId,
-      paymentStatus: 'cod_pending',
+      paymentStatus: orderPaymentStatus,
     })
 
     await tx.insert(orderItems).values(
@@ -82,5 +85,12 @@ export async function POST(req: NextRequest) {
     }
   })
 
+  // Send order confirmation email and WhatsApp notifications asynchronously
+  notifyOrderPlaced(orderId).catch((err) => {
+    console.error('[initiate] Failed to dispatch order placed notifications:', err)
+  })
+
+  // Delhivery shipment creation is a manual admin action (see updateOrderStatus in
+  // src/lib/actions/admin.ts) — an admin reviews the order before it ships.
   return NextResponse.json({ success: true, orderId })
 }

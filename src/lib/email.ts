@@ -335,3 +335,138 @@ export async function sendOrderConfirmationEmail({
     return { success: false, error: err.message || String(err) }
   }
 }
+
+/**
+ * Sends order cancellation email
+ */
+export async function sendOrderCancellationEmail({
+  email,
+  orderId,
+  customerName,
+}: {
+  email: string
+  orderId: string
+  customerName: string
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const contentHtml = `
+    <h1 style="font-family: 'Bodoni Moda', serif; font-style: italic; font-weight: 700; font-size: 28px; margin-top: 0; color: ${BRAND_DEEP};">
+      Order Cancelled
+    </h1>
+    <p style="font-size: 15px; color: ${BRAND_MID};">
+      Dear ${customerName},
+    </p>
+    <p style="font-size: 15px; color: ${BRAND_MID};">
+      Your order <strong>${orderId}</strong> has been cancelled. No payment was collected for this order.
+    </p>
+    <p style="font-size: 13px; color: ${BRAND_MUTED}; margin-top: 25px; line-height: 1.5; border-left: 2px solid ${BRAND_GOLD}; padding-left: 15px;">
+      If you have any questions or did not request this cancellation, please reach out to our customer support.
+    </p>
+  `
+
+  const html = getHtmlWrapper(contentHtml)
+
+  if (!resend) {
+    console.log('=== [DEVELOPMENT EMAIL LOG] ===')
+    console.log(`To: ${email}`)
+    console.log(`Subject: Your Al Noor Order has been Cancelled (${orderId})`)
+    console.log('===============================')
+    return { success: true, id: 'dev-mode' }
+  }
+
+  try {
+    const response = await resend.emails.send({
+      from: 'Al Noor Luxury <orders@al-noor.co>',
+      to: email,
+      subject: `Your Al Noor Order has been Cancelled (${orderId})`,
+      html,
+    })
+
+    if (response.error) {
+      console.error('[email] Resend error:', response.error)
+      return { success: false, error: response.error.message }
+    }
+
+    return { success: true, id: response.data?.id }
+  } catch (err: any) {
+    console.error('[email] Exception sending cancellation email:', err)
+    return { success: false, error: err.message || String(err) }
+  }
+}
+
+/**
+ * Sends order status update email
+ */
+export async function sendOrderStatusUpdateEmail({
+  email,
+  orderId,
+  status,
+  trackingNumber,
+  customerName,
+}: {
+  email: string
+  orderId: string
+  status: string
+  trackingNumber?: string | null
+  customerName: string
+}): Promise<{ success: boolean; id?: string; error?: string }> {
+  const statusLabel = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase()
+
+  let trackingHtml = ''
+  if (status.toLowerCase() === 'shipped' && trackingNumber) {
+    const trackUrl = `https://www.delhivery.com/track/share?waybill=${trackingNumber}`
+    trackingHtml = `
+      <div style="font-size: 13px; color: ${BRAND_MID}; background-color: ${BRAND_IVORY}; padding: 15px; border-radius: 2px; border: 1px solid rgba(158, 127, 74, 0.1); line-height: 1.5; margin: 20px 0;">
+        <strong>Courier:</strong> Delhivery<br>
+        <strong>Waybill Number:</strong> ${trackingNumber}<br>
+        <div style="text-align: center; margin-top: 15px;">
+          <a href="${trackUrl}" class="button" style="display: inline-block; background-color: ${BRAND_GOLD}; color: #ffffff !important; text-decoration: none; padding: 14px 28px; font-family: 'Raleway', sans-serif; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; border-radius: 2px;" target="_blank">Track Shipment</a>
+        </div>
+      </div>
+    `
+  }
+
+  const contentHtml = `
+    <h1 style="font-family: 'Bodoni Moda', serif; font-style: italic; font-weight: 700; font-size: 28px; margin-top: 0; color: ${BRAND_DEEP};">
+      Order Status Update: ${statusLabel}
+    </h1>
+    <p style="font-size: 15px; color: ${BRAND_MID};">
+      Dear ${customerName},
+    </p>
+    <p style="font-size: 15px; color: ${BRAND_MID};">
+      The status of your order <strong>${orderId}</strong> has been updated to <strong>${statusLabel}</strong>.
+    </p>
+    ${trackingHtml}
+    <p style="font-size: 13px; color: ${BRAND_MUTED}; margin-top: 25px; line-height: 1.5; border-left: 2px solid ${BRAND_GOLD}; padding-left: 15px;">
+      You can track this order directly inside your account profile dashboard.
+    </p>
+  `
+
+  const html = getHtmlWrapper(contentHtml)
+
+  if (!resend) {
+    console.log('=== [DEVELOPMENT EMAIL LOG] ===')
+    console.log(`To: ${email}`)
+    console.log(`Subject: Al Noor Order Status Update: ${statusLabel} (${orderId})`)
+    console.log('===============================')
+    return { success: true, id: 'dev-mode' }
+  }
+
+  try {
+    const response = await resend.emails.send({
+      from: 'Al Noor Luxury <orders@al-noor.co>',
+      to: email,
+      subject: `Al Noor Order Status Update: ${statusLabel} (${orderId})`,
+      html,
+    })
+
+    if (response.error) {
+      console.error('[email] Resend error:', response.error)
+      return { success: false, error: response.error.message }
+    }
+
+    return { success: true, id: response.data?.id }
+  } catch (err: any) {
+    console.error('[email] Exception sending status update email:', err)
+    return { success: false, error: err.message || String(err) }
+  }
+}

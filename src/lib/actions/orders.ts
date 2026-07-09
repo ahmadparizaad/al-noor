@@ -5,6 +5,7 @@ import { orders, orderItems, products } from '@/lib/schema'
 import { eq, desc, inArray, sql } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { trackDelhiveryShipment, cancelDelhiveryShipment } from '@/lib/delhivery'
+import { notifyOrderCancelled } from '@/lib/notifications'
 
 export interface UserOrderItem {
   productId: string
@@ -270,6 +271,11 @@ export async function cancelOrder(orderId: string, reason: string): Promise<{ su
           })
           .where(eq(products.id, item.productId))
       }
+    })
+
+    // Trigger order cancellation notifications asynchronously (both Email and WhatsApp)
+    notifyOrderCancelled(orderId).catch(err => {
+      console.error('[cancel-order] Failed to dispatch order cancelled notifications:', err)
     })
 
     return { success: true, message: 'Order cancelled successfully' }
