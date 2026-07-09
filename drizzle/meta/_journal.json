@@ -15,6 +15,27 @@
       "when": 1782108833062,
       "tag": "0001_mushy_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782298495403,
+      "tag": "0002_empty_whistler",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783310917128,
+      "tag": "0003_bumpy_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783524646438,
+      "tag": "0004_productive_rattler",
+      "breakpoints": true
     }
   ]
 }

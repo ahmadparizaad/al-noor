@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { AdminOrder, AdminCustomer, AdminProduct, RevenueMonth } from '@/types/admin'
 import { createDelhiveryShipment } from '@/lib/delhivery'
+import { sendWhatsAppOrderStatusUpdate } from '@/lib/whatsapp'
 
 async function requireAdmin() {
   const session = await auth()
@@ -184,9 +185,13 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
 
   const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1)
 
-  const isTransitioning = order && order.status !== 'processing' && order.status !== 'shipped'
+  if (!order) {
+    return { success: false, error: 'Order not found.' }
+  }
 
-  if (order && (status === 'processing' || status === 'shipped') && isTransitioning && !order.trackingNumber && !trackingNumber) {
+  const isTransitioning = order.status !== 'processing' && order.status !== 'shipped'
+
+  if ((status === 'processing' || status === 'shipped') && isTransitioning && !order.trackingNumber && !trackingNumber) {
     try {
       const shippingAddr = JSON.parse(order.shippingAddress)
 
@@ -211,7 +216,8 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
         consigneeCity: shippingAddr.city,
         consigneeState: shippingAddr.state,
         totalAmount: Number(order.totalInr),
-        paymentType: order.paymentStatus === 'paid' ? 'Prepaid' : 'COD',
+        // Live checkout is COD-only (Cashfree/PhonePe prepaid flow is retired dead code).
+        paymentType: 'COD',
         productName: productNames || 'Luxury Watch',
       })
 
@@ -219,10 +225,18 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
         trackingToSave = result.waybill
       } else {
         console.error('Failed to create Delhivery shipment:', result.error)
+        return { success: false, error: result.error || 'Failed to create Delhivery shipment. Order was not marked as shipped.' }
       }
     } catch (err) {
       console.error('Error during automatic Delhivery shipment creation:', err)
+      return { success: false, error: 'Failed to create Delhivery shipment. Order was not marked as shipped.' }
     }
+  }
+
+  // A shipped/processing order must have a real tracking number — either supplied
+  // manually or created above — so the tracking page never shows a fabricated status.
+  if ((status === 'processing' || status === 'shipped') && !order.trackingNumber && !trackingToSave) {
+    return { success: false, error: 'Cannot mark order as shipped without a tracking number.' }
   }
 
   await db.update(orders).set({
@@ -230,6 +244,24 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
     ...(trackingToSave && { trackingNumber: trackingToSave }),
     updatedAt: new Date()
   }).where(eq(orders.id, orderId))
+
+  // Trigger WhatsApp notification for order status update asynchronously
+  try {
+    const shippingAddr = JSON.parse(order.shippingAddress)
+    const phoneToNotify = shippingAddr?.phone
+    if (phoneToNotify) {
+      // Run as promise so it doesn't block the UI
+      sendWhatsAppOrderStatusUpdate(phoneToNotify, {
+        id: orderId,
+        status: status,
+        trackingNumber: trackingToSave || order.trackingNumber
+      }).catch(err => {
+        console.error('[admin-order] Failed to send order status WhatsApp:', err)
+      })
+    }
+  } catch (err) {
+    console.error('[admin-order] Failed to parse shipping address for WhatsApp notification:', err)
+  }
 
   revalidatePath('/admin/orders')
   revalidatePath('/admin/dashboard')

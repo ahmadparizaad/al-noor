@@ -6,6 +6,8 @@ export const orderStatusEnum = pgEnum('order_status', [
 
 export const userRoleEnum = pgEnum('user_role', ['customer', 'admin'])
 
+export const deviceTypeEnum = pgEnum('device_type', ['mobile', 'desktop', 'tablet'])
+
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
@@ -13,8 +15,20 @@ export const users = pgTable('users', {
   phone: text('phone'),
   passwordHash: text('password_hash'),
   role: userRoleEnum('role').default('customer').notNull(),
+  emailVerified: timestamp('email_verified'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
+
+export const verificationTokens = pgTable('verification_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, t => [
+  index('idx_verification_tokens_user_id').on(t.userId),
+])
+
 
 
 export const products = pgTable('products', {
@@ -39,7 +53,10 @@ export const orders = pgTable('orders', {
   totalInr: decimal('total_inr', { precision: 10, scale: 2 }).notNull(),
   shippingAddress: text('shipping_address').notNull(),  // JSON string
   phonePeTransactionId: text('phonepe_transaction_id').unique(),
-  paymentStatus: text('payment_status').default('pending').notNull(),
+  // Live flow is COD-only (Delhivery collects cash on delivery): 'cod_pending' -> 'cod_collected' | 'cancelled'.
+  // 'refund_pending' / 'refunded' are reserved for a future prepaid/return flow, not written by any code yet.
+  // 'paid' / 'failed' are legacy values written only by the retired Cashfree/PhonePe routes (kept as dead code).
+  paymentStatus: text('payment_status').default('cod_pending').notNull(),
   trackingNumber: text('tracking_number'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -97,4 +114,49 @@ export const featuredProducts = pgTable('featured_products', {
   productId: text('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
+
+export const qrCodes = pgTable('qr_codes', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  destination: text('destination').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  scanCount: integer('scan_count').default(0).notNull(),
+  qrPngUrl: text('qr_png_url').notNull(),
+  qrSvgUrl: text('qr_svg_url').notNull(),
+  qrColor: text('qr_color').default('#000000').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const qrScans = pgTable('qr_scans', {
+  id: text('id').primaryKey(),
+  qrCodeId: text('qr_code_id').references(() => qrCodes.id, { onDelete: 'cascade' }).notNull(),
+  scannedAt: timestamp('scanned_at').defaultNow().notNull(),
+  deviceType: deviceTypeEnum('device_type'),
+  browser: text('browser'),
+  os: text('os'),
+  city: text('city'),
+  country: text('country'),
+  region: text('region'),
+  latitude: decimal('latitude', { precision: 9, scale: 6 }),
+  longitude: decimal('longitude', { precision: 9, scale: 6 }),
+  userAgent: text('user_agent'),
+  referrer: text('referrer'),
+}, t => [
+  index('idx_qr_scans_qr_code_id').on(t.qrCodeId),
+  index('idx_qr_scans_scanned_at').on(t.scannedAt),
+])
+
+export const phoneOtps = pgTable('phone_otps', {
+  id: text('id').primaryKey(),
+  phone: text('phone').notNull(),
+  otpHash: text('otp_hash').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  attempts: integer('attempts').default(0).notNull(),
+}, t => [
+  index('idx_phone_otps_phone').on(t.phone),
+])
+
 

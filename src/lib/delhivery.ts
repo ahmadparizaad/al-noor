@@ -20,15 +20,11 @@ function isMockMode() {
   return token === 'mock_delhivery_api_token' || token.startsWith('mock')
 }
 
-// Al Noor Luxury default warehouse/pickup location (Delhi/NCR area)
+// Must match the warehouse name registered in the Delhivery merchant dashboard exactly —
+// Delhivery's create-shipment API looks pickup locations up by this name and fails with
+// "ClientWarehouse matching query does not exist." if it doesn't match.
 export const DEFAULT_PICKUP_LOCATION = {
-  name: 'Al Noor Luxury Atelier',
-  add: 'Plot No. 42, Sector 18, Udyog Vihar Phase IV',
-  pin: '122015',
-  city: 'Gurugram',
-  state: 'Haryana',
-  country: 'India',
-  phone: '9876543210',
+  name: 'AL B2C',
 }
 
 export interface PincodeServiceabilityResult {
@@ -67,7 +63,7 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
   try {
     const token = getDelhiToken()
     const url = getDelhiUrl(`/c/api/pin-codes/json/?filter_codes=${pincode}`)
-    
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -77,7 +73,7 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
     })
 
     if (!response.ok) {
-      console.error(`Delhivery Pincode serviceability API error: ${response.status} ${response.statusText}`)
+      console.error(`[Delhivery Serviceability] Delhivery Pincode serviceability API error: ${response.status} ${response.statusText}`)
       return { isServiceable: false, isCod: false, isPrepaid: false }
     }
 
@@ -90,13 +86,17 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
 
     const postalCodeInfo = deliveryCodes[0]?.postal_code || deliveryCodes[0]?.pin_code
     if (!postalCodeInfo) {
+      console.warn(`[Delhivery Serviceability] postal_code or pin_code not found in delivery_codes[0] for pincode: ${pincode}`)
       return { isServiceable: false, isCod: false, isPrepaid: false }
     }
 
     // Delhivery API can return string 'Y'/'N' or boolean
-    const isServiceable = postalCodeInfo.is_serviceable === true || postalCodeInfo.is_serviceable === 'Y'
     const isCod = postalCodeInfo.cod === true || postalCodeInfo.cod === 'Y' || postalCodeInfo.is_cod_serviceable === true
-    const isPrepaid = postalCodeInfo.prepaid === true || postalCodeInfo.prepaid === 'Y' || postalCodeInfo.is_prepaid_serviceable === true
+    const isPrepaid = postalCodeInfo.prepaid === true || postalCodeInfo.prepaid === 'Y' || postalCodeInfo.pre_paid === true || postalCodeInfo.pre_paid === 'Y' || postalCodeInfo.is_prepaid_serviceable === true
+    
+    // If pincode is found in Delhivery's serviceable codes database and has either COD or Prepaid enabled,
+    // and is not explicitly set to false or 'N', we treat it as serviceable.
+    const isServiceable = (postalCodeInfo.is_serviceable !== false && postalCodeInfo.is_serviceable !== 'N') && (isCod || isPrepaid)
 
     return {
       isServiceable,
@@ -107,7 +107,7 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
       estimatedDeliveryDays: postalCodeInfo.d_time || '3-5 days',
     }
   } catch (error) {
-    console.error('Error checking Delhivery pincode serviceability:', error)
+    console.error('[Delhivery Serviceability] Error checking Delhivery pincode serviceability:', error)
     return { isServiceable: false, isCod: false, isPrepaid: false }
   }
 }
@@ -141,37 +141,31 @@ export interface CreateShipmentResult {
  * Register a shipment on Delhivery and get a Waybill / tracking number
  */
 export async function createDelhiveryShipment(params: CreateShipmentParams): Promise<CreateShipmentResult> {
+  // Field names verified against Delhivery's live /api/cmu/create.json — their B2C
+  // shipment object uses these short names, not the "consignee_*" names shown in some docs.
   const payload = {
     shipments: [
       {
         order: params.orderId,
-        consignee_name: params.consigneeName,
-        consignee_phone: params.consigneePhone,
-        consignee_address: params.consigneeAddress,
-        consignee_pincode: params.consigneePincode,
-        consignee_city: params.consigneeCity,
-        consignee_state: params.consigneeState,
-        consignee_country: params.consigneeCountry || 'India',
-        package_type: params.paymentType, // "Prepaid" or "COD"
+        name: params.consigneeName,
+        phone: params.consigneePhone,
+        add: params.consigneeAddress,
+        pin: params.consigneePincode,
+        city: params.consigneeCity,
+        state: params.consigneeState,
+        country: params.consigneeCountry || 'India',
+        payment_mode: params.paymentType, // "Prepaid" or "COD"
         weight: params.weightKg || 0.5,
-        length: params.lengthCm || 15,
-        breadth: params.breadthCm || 15,
-        height: params.heightCm || 10,
+        shipment_length: params.lengthCm || 15,
+        shipment_width: params.breadthCm || 15,
+        shipment_height: params.heightCm || 10,
         cod_amount: params.paymentType === 'COD' ? params.totalAmount : 0,
-        product: params.productName || 'Luxury Watch',
+        products_desc: params.productName || 'Luxury Watch',
         seller_name: DEFAULT_PICKUP_LOCATION.name,
-        seller_address: DEFAULT_PICKUP_LOCATION.add,
-        seller_phone: DEFAULT_PICKUP_LOCATION.phone,
       }
     ],
     pickup_location: {
       name: DEFAULT_PICKUP_LOCATION.name,
-      add: DEFAULT_PICKUP_LOCATION.add,
-      pin: DEFAULT_PICKUP_LOCATION.pin,
-      city: DEFAULT_PICKUP_LOCATION.city,
-      state: DEFAULT_PICKUP_LOCATION.state,
-      country: DEFAULT_PICKUP_LOCATION.country,
-      phone: DEFAULT_PICKUP_LOCATION.phone,
     }
   }
 
@@ -210,27 +204,24 @@ export async function createDelhiveryShipment(params: CreateShipmentParams): Pro
     })
 
     if (!response.ok) {
-      console.error(`Delhivery CMU API error: ${response.status} ${response.statusText}`)
+      console.error(`[Delhivery Shipment] Delhivery CMU API error: ${response.status} ${response.statusText}`)
       return { success: false, error: `Delhivery server returned status ${response.status}` }
     }
 
     const data = await response.json()
-    
-    // Delhivery response structure verification
-    const shipmentResponse = data?.shipment_response?.[0] || data?.packages?.[0]
-    
-    if (data?.success === false || (shipmentResponse && shipmentResponse.status === 'Failure')) {
-      const errorMsg = shipmentResponse?.remarks?.[0] || data?.error || 'Unknown error occurred on Delhivery'
+
+    // Delhivery's create-shipment response nests the per-package result in `packages[0]`,
+    // with `status: "Success" | "Fail"` and a top-level `rmk` describing internal errors.
+    const packageResult = data?.packages?.[0]
+
+    if (data?.success === false || packageResult?.status !== 'Success' || !packageResult?.waybill) {
+      const errorMsg = packageResult?.remarks?.[0] || data?.rmk || 'Unknown error occurred on Delhivery'
+      console.error(`[Delhivery Shipment] Shipment creation failed. Error: ${errorMsg}`)
       return { success: false, error: errorMsg, rawResponse: data }
     }
 
-    const waybill = shipmentResponse?.waybill || shipmentResponse?.awb
-    
-    if (!waybill) {
-      return { success: false, error: 'No waybill found in response', rawResponse: data }
-    }
+    const waybill = packageResult.waybill
 
-    // Save waybill/tracking number to orders database
     await db.update(orders)
       .set({ trackingNumber: waybill, status: 'processing', updatedAt: new Date() })
       .where(eq(orders.id, params.orderId))
@@ -241,7 +232,64 @@ export async function createDelhiveryShipment(params: CreateShipmentParams): Pro
       rawResponse: data
     }
   } catch (error) {
-    console.error('Error creating Delhivery shipment:', error)
+    console.error('[Delhivery Shipment] Error creating Delhivery shipment:', error)
+    const errorMsg = error instanceof Error ? error.message : 'Network error'
+    return { success: false, error: errorMsg }
+  }
+}
+
+export interface CancelShipmentResult {
+  success: boolean
+  error?: string
+}
+
+/**
+ * Cancel a manifested Delhivery shipment before it has been picked up.
+ * Delhivery rejects cancellation once a shipment is out for pickup/in transit —
+ * callers should treat a failure here as "cannot cancel," not retry.
+ *
+ * UNVERIFIED: the /api/p/edit payload shape ({ waybill, cancellation: true }) and the
+ * data.status/data.rmk response fields below are inferred from Delhivery's cancel-shipment
+ * docs, not confirmed against a live/staging call (unlike createDelhiveryShipment, which was
+ * verified against the live API). Confirm against a real request before relying on this in prod.
+ */
+export async function cancelDelhiveryShipment(waybill: string): Promise<CancelShipmentResult> {
+  if (isMockMode()) {
+    return { success: true }
+  }
+
+  try {
+    const token = getDelhiToken()
+    const url = getDelhiUrl('/api/p/edit')
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ waybill, cancellation: true }),
+    })
+
+    if (!response.ok) {
+      console.error(`[Delhivery Cancel] Delhivery cancel API error: ${response.status} ${response.statusText}`)
+      return { success: false, error: `Delhivery server returned status ${response.status}` }
+    }
+
+    const data = await response.json()
+
+    // Field names/types (status as bool or 'true' string, rmk/remark for errors) are
+    // defensive assumptions pending live API verification — see the UNVERIFIED note above.
+    if (data?.status !== true && data?.status !== 'true') {
+      const errorMsg = data?.rmk || data?.remark || 'Delhivery rejected the cancellation request'
+      console.error(`[Delhivery Cancel] Shipment cancellation failed for waybill ${waybill}: ${errorMsg}`)
+      return { success: false, error: errorMsg }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('[Delhivery Cancel] Error cancelling Delhivery shipment:', error)
     const errorMsg = error instanceof Error ? error.message : 'Network error'
     return { success: false, error: errorMsg }
   }
@@ -339,16 +387,17 @@ export async function trackDelhiveryShipment(waybill: string): Promise<TrackingR
     })
 
     if (!response.ok) {
-      console.error(`Delhivery Tracking API error: ${response.status} ${response.statusText}`)
+      console.error(`[Delhivery Tracking] Delhivery Tracking API error: ${response.status} ${response.statusText}`)
       return null
     }
 
     const data = await response.json()
-    
+
     // Parse Delhivery tracking response structure
     const trackingData = data?.ShipmentData?.[0]?.Shipment || data?.tracking_data || data?.[0]
     
     if (!trackingData) {
+      console.warn(`[Delhivery Tracking] No tracking data found in response for waybill: ${waybill}`)
       return null
     }
 
@@ -381,7 +430,7 @@ export async function trackDelhiveryShipment(waybill: string): Promise<TrackingR
       ],
     }
   } catch (error) {
-    console.error('Error tracking Delhivery shipment:', error)
+    console.error('[Delhivery Tracking] Error tracking Delhivery shipment:', error)
     return null
   }
 }

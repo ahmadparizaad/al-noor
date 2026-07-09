@@ -27,7 +27,7 @@ const T = {
   orange:      '#D97706',
 }
 
-type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
 
 interface TrackingEvent {
   status: string
@@ -52,47 +52,16 @@ interface OrderData {
 // Order status pipeline — each step has an index
 const STATUS_STEPS: { key: OrderStatus; label: string; icon: string }[] = [
   { key: 'confirmed',  label: 'Order Confirmed',    icon: '✓'  },
-  { key: 'processing', label: 'Atelier Processing',  icon: '⚙' },
+  { key: 'processing', label: 'Processing',          icon: '⚙' },
   { key: 'shipped',    label: 'Shipped',             icon: '📦' },
   { key: 'delivered',  label: 'Delivered',           icon: '🏠' },
 ]
 
+// Statuses not in STATUS_STEPS (pending, cancelled, refunded) don't have a pipeline
+// position — callers must check isTerminalNonDelivery before rendering the stepper.
 function statusIndex(status: OrderStatus): number {
   const idx = STATUS_STEPS.findIndex(s => s.key === status)
-  return idx === -1 ? (status === 'pending' ? 0 : 0) : idx
-}
-
-// Mock order for demo (used when DB not connected or as fallback)
-function mockOrder(orderId: string): OrderData {
-  const created    = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // 2 days ago
-  const estimated  = new Date(Date.now() + 8 * 24 * 60 * 60 * 1000) // 8 days from now
-
-  return {
-    id:                orderId,
-    status:            'shipped',
-    paymentStatus:     'paid',
-    totalInr:          '28500',
-    trackingNumber:    'DELH' + orderId.slice(0, 8).toUpperCase(),
-    createdAt:         created.toISOString(),
-    estimatedDelivery: estimated.toISOString(),
-    product: {
-      name: 'Noor I Fumé Blue Tourbillon',
-      ref:  'AN-001-TI-FB',
-      dial: 'Fumé Blue',
-    },
-    address: {
-      name:    'Valued Customer',
-      city:    'Mumbai',
-      state:   'Maharashtra',
-      pincode: '400001',
-    },
-    events: [
-      { status: 'Manifest Created',   location: 'Gurugram, Haryana',   timestamp: new Date(Date.now() - 18 * 3600_000).toISOString(), note: 'Shipment data received, waiting for pickup' },
-      { status: 'Shipped',            location: 'Gurugram Warehouse',  timestamp: new Date(Date.now() - 15 * 3600_000).toISOString(), note: 'Picked up by Delhivery' },
-      { status: 'In Transit',         location: 'Delhi Hub',           timestamp: new Date(Date.now() - 10 * 3600_000).toISOString(), note: 'Transit hub — on schedule' },
-      { status: 'Out for Delivery',   location: 'Mumbai, Maharashtra', timestamp: new Date(Date.now() - 1  * 3600_000).toISOString(), note: 'With delivery partner' },
-    ],
-  }
+  return idx === -1 ? 0 : idx
 }
 
 function fmtDate(iso: string) {
@@ -111,6 +80,7 @@ function fmtDateShort(iso: string) {
 function statusColor(status: OrderStatus) {
   if (status === 'delivered')  return T.green
   if (status === 'cancelled')  return T.red
+  if (status === 'refunded')   return T.muted
   if (status === 'shipped')    return '#2563EB'
   return T.orange
 }
@@ -193,13 +163,8 @@ function TrackingView({ orderId }: { orderId: string }) {
       .catch(err => {
         if (active) {
           console.error('Error fetching order tracking info:', err)
-          if (process.env.NODE_ENV === 'development' || orderId.startsWith('demo')) {
-            setOrder(mockOrder(orderId))
-            setLoading(false)
-          } else {
-            setError(err.message || 'Order not found')
-            setLoading(false)
-          }
+          setError(err.message || 'Order not found')
+          setLoading(false)
         }
       })
 
@@ -244,7 +209,9 @@ function TrackingView({ orderId }: { orderId: string }) {
   }
 
   const currentStep = statusIndex(order.status)
-  const isCancelled = order.status === 'cancelled'
+  // Cancelled/refunded orders don't progress through the shipping pipeline —
+  // the stepper and "expected delivery" banner would be misleading for them.
+  const isTerminalNonDelivery = order.status === 'cancelled' || order.status === 'refunded'
 
   return (
     <div style={{ maxWidth: 860, margin: '0 auto', padding: isMobile ? '0 16px 96px' : '0 24px 80px' }}>
@@ -278,12 +245,12 @@ function TrackingView({ orderId }: { orderId: string }) {
             <div style={{ fontSize: 13, color: T.deep, marginTop: 2 }}>{fmtDateShort(order.createdAt)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{order.paymentStatus?.includes('cod') ? 'COD Amount' : 'Amount Paid'}</div>
+            <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{(order.paymentStatus === 'cod_pending' || order.paymentStatus === 'cod_collected') ? 'COD Amount' : 'Amount Paid'}</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: T.deep, marginTop: 2 }}>{formatPrice(Number(order.totalInr))}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: isCancelled ? T.red : statusColor(order.status), display: 'inline-block', flexShrink: 0 }} />
-            <span style={{ fontSize: 14, fontWeight: 700, color: isCancelled ? T.red : statusColor(order.status) }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', background: statusColor(order.status), display: 'inline-block', flexShrink: 0 }} />
+            <span style={{ fontSize: 14, fontWeight: 700, color: statusColor(order.status) }}>
               {statusLabel(order.status)}
             </span>
           </div>
@@ -314,7 +281,7 @@ function TrackingView({ orderId }: { orderId: string }) {
         </div>
 
         {/* Estimated delivery banner */}
-        {!isCancelled && (
+        {!isTerminalNonDelivery && (
           <div style={{ background: '#EBF5EF', borderTop: `1px solid #C3E0CC`, padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.green} strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
             <span style={{ fontSize: 13, color: T.green, fontWeight: 600 }}>
@@ -330,7 +297,7 @@ function TrackingView({ orderId }: { orderId: string }) {
       </div>
 
       {/* ── Progress stepper ── */}
-      {!isCancelled && (
+      {!isTerminalNonDelivery && (
         <div style={{ background: T.white, border: `1px solid ${T.borderLight}`, borderRadius: 2, boxShadow: T.shadowSm, padding: isMobile ? '20px 16px' : '28px 32px', marginBottom: 16 }}>
           <div style={{ position: 'relative' }}>
             {/* Connector line behind dots */}
@@ -435,7 +402,7 @@ function TrackingView({ orderId }: { orderId: string }) {
           {[
             { label: 'Courier',    value: 'Delhivery' },
             { label: 'Service',    value: 'Delhivery Express' },
-            { label: 'Payment Mode', value: order.paymentStatus?.includes('cod') ? 'Cash on Delivery (COD)' : 'Prepaid' },
+            { label: 'Payment Mode', value: (order.paymentStatus === 'cod_pending' || order.paymentStatus === 'cod_collected') ? 'Cash on Delivery (COD)' : 'Prepaid' },
             { label: 'Packaging',  value: 'Discreet, signature required' },
             { label: 'Insurance',  value: 'Full declared value covered' },
           ].map(row => (
@@ -452,7 +419,6 @@ function TrackingView({ orderId }: { orderId: string }) {
           {[
             { icon: '📧', label: 'Email support', sub: 'enquire@alnoor.com', href: 'mailto:enquire@alnoor.com' },
             { icon: '🕐', label: 'Response time', sub: 'Within 2 business hours', href: null },
-            { icon: '↩️', label: '30-day returns', sub: 'Hassle-free return policy', href: '#' },
           ].map(item => (
             <div key={item.label} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
               <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
