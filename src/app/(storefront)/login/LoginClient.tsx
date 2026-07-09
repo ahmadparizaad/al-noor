@@ -48,6 +48,7 @@ function LoginInner() {
   const { isMobile } = useBreakpoint()
 
   const [mode, setMode]       = useState<Mode>('login')
+  const [loginMethod, setLoginMethod] = useState<'whatsapp' | 'email'>('email')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(
@@ -69,6 +70,21 @@ function LoginInner() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
+    try {
+      const checkRes = await fetch(`/api/auth/check-verified?email=${encodeURIComponent(loginEmail)}`)
+      const checkData = await checkRes.json()
+      if (checkRes.ok && checkData.exists && !checkData.verified) {
+        setError('Please verify your email address before logging in. A verification link was sent to your email.')
+        setLoading(false)
+        return
+      }
+    } catch (err) {
+      // Raw console.error is used here as a minimal logging fallback because the project does not have a centralized logger utility.
+      console.error(err)
+      // Fallback: proceed to NextAuth signIn if check fails
+    }
+
     const result = await signIn('credentials', {
       email: loginEmail,
       password: loginPassword,
@@ -107,17 +123,10 @@ function LoginInner() {
         setLoading(false)
         return
       }
-      // Auto sign in after registration
-      const result = await signIn('credentials', { email: regEmail, password: regPassword, redirect: false })
       setLoading(false)
-      if (result?.error) {
-        setSuccess('Account created! Please sign in.')
-        setMode('login')
-        setLoginEmail(regEmail)
-      } else {
-        router.push(callback)
-        router.refresh()
-      }
+      setSuccess('Account created! A verification link has been sent to your email. Please verify before signing in.')
+      setMode('login')
+      setLoginEmail(regEmail)
     } catch {
       setError('Network error. Please try again.')
       setLoading(false)
@@ -154,7 +163,9 @@ function LoginInner() {
               </h1>
               <p style={{ fontSize: 13, color: T.muted, marginTop: 6, marginBottom: 0 }}>
                 {mode === 'login'
-                  ? 'Sign in to access your saved addresses and orders'
+                  ? (loginMethod === 'whatsapp'
+                    ? 'Passwordless WhatsApp sign-in is coming soon'
+                    : 'Sign in to access your saved addresses and orders')
                   : 'Join to save addresses and track your timepieces'}
               </p>
             </div>
@@ -194,8 +205,46 @@ function LoginInner() {
                 </div>
               ) : null}
 
-              {/* LOGIN FORM */}
-              {mode === 'login' && (
+              {/* LOGIN FORM - WHATSAPP METHOD (disabled: coming soon) */}
+              {mode === 'login' && loginMethod === 'whatsapp' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                    padding: '32px 20px', border: `1.5px dashed ${T.border}`, borderRadius: 2,
+                    background: T.parchment,
+                  }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={T.muted} strokeWidth="1.5">
+                      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                    </svg>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: T.mid, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                      WhatsApp Sign-In — Coming Soon
+                    </span>
+                    <span style={{ fontSize: 12, color: T.muted, textAlign: 'center', maxWidth: 280 }}>
+                      Passwordless sign-in via WhatsApp OTP is on its way. Use email & password for now.
+                    </span>
+                  </div>
+
+                  <div style={{ textAlign: 'center', marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginMethod('email'); setError(null); setSuccess(null) }}
+                      style={{ background: 'none', border: 'none', color: T.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Raleway', sans-serif" }}
+                    >
+                      Sign in with email & password instead
+                    </button>
+                  </div>
+
+                  <div style={{ textAlign: 'center', fontSize: 12, color: T.muted }}>
+                    Don&apos;t have an account?{' '}
+                    <button type="button" onClick={() => setMode('register')} style={{ color: T.gold, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>
+                      Create one
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* LOGIN FORM - EMAIL METHOD */}
+              {mode === 'login' && loginMethod === 'email' && (
                 <form onSubmit={handleLogin} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: T.mid, letterSpacing: '0.03em' }}>Email Address</label>
@@ -215,12 +264,23 @@ function LoginInner() {
                   </div>
                   <button
                     type="submit" disabled={loading}
-                    style={{ marginTop: 4, height: 48, background: loading ? T.muted : T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Raleway', sans-serif' ", transition: 'background 0.2s' }}
+                    style={{ marginTop: 4, height: 48, background: loading ? T.muted : T.gold, color: '#fff', border: 'none', borderRadius: 2, fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', cursor: loading ? 'not-allowed' : 'pointer', fontFamily: "'Raleway', sans-serif", transition: 'background 0.2s' }}
                   >
                     {loading ? 'Signing In…' : 'Sign In'}
                   </button>
+
+                  <div style={{ textAlign: 'center', marginTop: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setLoginMethod('whatsapp'); setError(null); setSuccess(null) }}
+                      style={{ background: 'none', border: 'none', color: T.gold, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: "'Raleway', sans-serif" }}
+                    >
+                      Sign in with WhatsApp (coming soon)
+                    </button>
+                  </div>
+
                   <div style={{ textAlign: 'center', fontSize: 12, color: T.muted }}>
-                    Don't have an account?{' '}
+                    Don&apos;t have an account?{' '}
                     <button type="button" onClick={() => setMode('register')} style={{ color: T.gold, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', fontSize: 12 }}>
                       Create one
                     </button>
@@ -275,7 +335,7 @@ function LoginInner() {
                       style={inputStyle(regConfirm.length > 0 && regConfirm !== regPassword)}
                     />
                     {regConfirm.length > 0 && regConfirm !== regPassword ? (
-                      <span style={{ fontSize: 11, color: T.red }}>Passwords don't match</span>
+                      <span style={{ fontSize: 11, color: T.red }}>Passwords don&apos;t match</span>
                     ) : null}
                   </div>
                   <button

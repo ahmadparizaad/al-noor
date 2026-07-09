@@ -88,6 +88,12 @@ function productToForm(p: AdminProduct): ProductForm {
   }
 }
 
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ fontFamily: DATA, fontSize: '11px', color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', fontWeight: 500 }}>
+    {children}
+  </div>
+)
+
 export default function InventoryClient({ initialProducts }: InventoryClientProps) {
   const { categories, materials, dialOptions, badges } = useCatalogue()
   const [filter, setFilter] = useState<FilterType>('all')
@@ -219,8 +225,9 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
   }
 
   // --- Sub-components ---
-  const FilterTab = ({ label, value }: { label: string; value: FilterType }) => (
+  const renderFilterTab = (label: string, value: FilterType) => (
     <button
+      key={value}
       onClick={() => setFilter(value)}
       style={{
         padding: '8px 16px',
@@ -238,12 +245,6 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
     >
       {label}
     </button>
-  )
-
-  const Label = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ fontFamily: DATA, fontSize: '11px', color: T.muted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px', fontWeight: 500 }}>
-      {children}
-    </div>
   )
 
   const inputStyle: React.CSSProperties = {
@@ -270,10 +271,10 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
             Inventory
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-            <FilterTab label="All" value="all" />
-            <FilterTab label="Active" value="active" />
-            <FilterTab label="Inactive" value="inactive" />
-            <FilterTab label="On Sale" value="sale" />
+            {renderFilterTab("All", "all")}
+            {renderFilterTab("Active", "active")}
+            {renderFilterTab("Inactive", "inactive")}
+            {renderFilterTab("On Sale", "sale")}
           </div>
         </div>
 
@@ -471,7 +472,7 @@ export default function InventoryClient({ initialProducts }: InventoryClientProp
                     <td colSpan={9} style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         <span style={{ fontFamily: DATA, fontSize: '13px', color: T.red, fontWeight: 500 }}>
-                          Delete "{product.name}"? This cannot be undone.
+                          Delete &ldquo;{product.name}&rdquo;? This cannot be undone.
                         </span>
                         <button
                           onClick={() => handleDelete(product.id)}

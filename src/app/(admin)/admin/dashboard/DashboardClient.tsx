@@ -112,6 +112,57 @@ const PRESET_LABEL: Record<Preset, string> = {
   last_year: 'Last Year',
 }
 
+const KPICard = ({
+  label: cardLabel,
+  value,
+  isPrice = false,
+  subtitle,
+}: {
+  label: string
+  value: string | number
+  isPrice?: boolean
+  subtitle?: string
+}) => (
+  <div
+    style={{
+      background: T.card,
+      border: `1px solid ${T.border}`,
+      borderRadius: '4px',
+      padding: '24px',
+      boxShadow: T.shadowSm,
+    }}
+  >
+    <div
+      style={{
+        fontFamily: DATA,
+        fontSize: '11px',
+        letterSpacing: '0.08em',
+        color: T.muted,
+        textTransform: 'uppercase',
+        marginBottom: '16px',
+      }}
+    >
+      {cardLabel}
+    </div>
+    <div
+      style={{
+        fontFamily: DATA,
+        fontSize: '28px',
+        fontVariantNumeric: 'tabular-nums',
+        color: isPrice ? T.gold : T.deep,
+        fontWeight: 600,
+      }}
+    >
+      {value}
+    </div>
+    {subtitle && (
+      <div style={{ fontFamily: DATA, fontSize: '11px', color: T.light, marginTop: '6px' }}>
+        {subtitle}
+      </div>
+    )}
+  </div>
+)
+
 export default function DashboardClient({ orders, products, userName }: DashboardClientProps) {
   const [preset, setPreset] = useState<Preset>('today')
 
@@ -132,57 +183,6 @@ export default function DashboardClient({ orders, products, userName }: Dashboar
 
   const recentOrders = orders.slice(0, 5)
   const label = PRESET_LABEL[preset]
-
-  const KPICard = ({
-    label: cardLabel,
-    value,
-    isPrice = false,
-    subtitle,
-  }: {
-    label: string
-    value: string | number
-    isPrice?: boolean
-    subtitle?: string
-  }) => (
-    <div
-      style={{
-        background: T.card,
-        border: `1px solid ${T.border}`,
-        borderRadius: '4px',
-        padding: '24px',
-        boxShadow: T.shadowSm,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: DATA,
-          fontSize: '11px',
-          letterSpacing: '0.08em',
-          color: T.muted,
-          textTransform: 'uppercase',
-          marginBottom: '16px',
-        }}
-      >
-        {cardLabel}
-      </div>
-      <div
-        style={{
-          fontFamily: DATA,
-          fontSize: '28px',
-          fontVariantNumeric: 'tabular-nums',
-          color: isPrice ? T.gold : T.deep,
-          fontWeight: 600,
-        }}
-      >
-        {value}
-      </div>
-      {subtitle && (
-        <div style={{ fontFamily: DATA, fontSize: '11px', color: T.light, marginTop: '6px' }}>
-          {subtitle}
-        </div>
-      )}
-    </div>
-  )
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'

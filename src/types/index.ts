@@ -2,7 +2,8 @@ export type UserRole = 'customer' | 'admin'
 
 export interface SessionUser {
   id: string
-  email: string
+  email?: string | null
+  phone?: string | null
   name?: string | null
   role: UserRole
 }
@@ -56,7 +57,8 @@ declare module 'next-auth' {
   interface Session {
     user: {
       id: string
-      email: string
+      email?: string | null
+      phone?: string | null
       name?: string | null
       role: UserRole
     }
@@ -67,6 +69,8 @@ declare module 'next-auth' {
   interface JWT {
     id?: string
     role?: string
+    phone?: string
+    email?: string
     accessExpiry?: number
     refreshToken?: string
     error?: string

@@ -60,3 +60,27 @@ export interface RevenueMonth {
   revenueInr: number
   ordersCount: number
 }
+
+export interface AdminQrCode {
+  id: string
+  name: string
+  slug: string
+  destination: string
+  isActive: boolean
+  scanCount: number
+  qrPngUrl: string
+  qrSvgUrl: string
+  qrColor: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface QrAnalytics {
+  totalScans: number
+  todayScans: number
+  deviceBreakdown: { mobile: number; desktop: number; tablet: number }
+  browserBreakdown: { name: string; count: number }[]
+  osBreakdown: { name: string; count: number }[]
+  dailyScans: { date: string; count: number }[]
+  locations: { city: string; country: string; latitude: number | null; longitude: number | null; count: number }[]
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, Suspense } from 'react'
+import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 
@@ -180,9 +181,9 @@ function AdminLoginInner() {
 
         {/* Back to store */}
         <div style={{ textAlign: 'center', marginTop: 20 }}>
-          <a href="/" style={{ fontSize: 11, color: T.muted, textDecoration: 'none', letterSpacing: '0.04em' }}>
+          <Link href="/" style={{ fontSize: 11, color: T.muted, textDecoration: 'none', letterSpacing: '0.04em' }}>
             ← Back to store
-          </a>
+          </Link>
         </div>
       </div>
     </div>

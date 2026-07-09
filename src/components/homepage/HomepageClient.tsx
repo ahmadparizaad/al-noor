@@ -27,7 +27,7 @@ const PILLARS = [
   { num: '01', title: '100% Original',    body: 'Every watch we sell is genuine, sourced directly, verified before it reaches you.' },
   { num: '02', title: 'Best Price',       body: 'Up to 45% off on all watches. No hidden costs, no compromise on authenticity.' },
   { num: '03', title: 'Insured Delivery', body: 'Fast shipping with full insurance, discreet packaging, and signature on arrival.' },
-  { num: '04', title: 'Easy Returns',     body: '30 days, no questions. We believe a watch must feel right on your wrist.' },
+  { num: '04', title: '5-Year Warranty',  body: 'Full movement coverage on every watch, backed by our team.' },
 ]
 
 const TESTIMONIALS = [
@@ -161,7 +161,7 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
           <div className="inline-block animate-ticker">
             {Array(4).fill(null).map((_, i) => (
               <span key={i} className="text-white text-[10px] font-semibold tracking-[0.18em] uppercase" style={{ fontFamily: UI }}>
-                &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Free Worldwide Insured Delivery&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;100% Original Watches&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Up to 45% Off&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;30-Day Free Returns&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Best Price Guaranteed
+                &nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Free Worldwide Insured Delivery&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;100% Original Watches&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Up to 45% Off&nbsp;&nbsp;&nbsp;·&nbsp;&nbsp;&nbsp;Best Price Guaranteed
               </span>
             ))}
           </div>
@@ -431,7 +431,7 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
                 style={{ animation: `fadeUp .7s ${idx * 0.12}s cubic-bezier(.22,.68,0,1.2) both` }}
               >
                 <div className="text-gold text-[14px] tracking-[2px] mb-5">{'★'.repeat(t.stars)}</div>
-                <p className="text-ivory/80 text-[18px] italic leading-[1.8] mb-7" style={{ fontFamily: BODY }}>"{t.text}"</p>
+                <p className="text-ivory/80 text-[18px] italic leading-[1.8] mb-7" style={{ fontFamily: BODY }}>&ldquo;{t.text}&rdquo;</p>
                 <div className="border-t border-gold/15 pt-5">
                   <div className="text-ivory text-[12px] font-bold tracking-[0.06em]" style={{ fontFamily: UI }}>{t.name}</div>
                   <div className="text-muted-warm text-[10px] mt-0.5" style={{ fontFamily: UI }}>{t.city}</div>
@@ -498,7 +498,6 @@ export function HomepageClient({ featured = [] }: { featured?: Product[] }) {
                 { label: 'Track Order',    href: '/track-order' },
                 { label: 'My Account',     href: '/account' },
                 { label: 'My Orders',      href: '/orders' },
-                { label: 'Returns Policy', href: '/products' },
                 { label: 'Contact Us',     href: 'mailto:care@alnoor.com' },
               ].map(l => (
                 <Link key={l.label} href={l.href}

@@ -11,7 +11,19 @@ import {
   sendWhatsAppOrderStatusUpdate,
 } from '@/lib/whatsapp'
 import { dispatch } from './dispatch'
-import { getEventInfo, OrderEvent } from './events'
+import { OrderEvent } from './events'
+
+export type { OrderEvent } from './events'
+
+interface ShippingAddress {
+  fullName?: string
+  phone?: string
+  line1?: string
+  line2?: string
+  city?: string
+  state?: string
+  pincode?: string
+}
 
 /**
  * Loads order, user, and order items with product titles from the database.
@@ -67,9 +79,9 @@ export async function notifyOrderPlaced(orderId: string): Promise<void> {
 
   const { order, user, items } = data
 
-  let shippingAddressObj: any = {}
+  let shippingAddressObj: ShippingAddress = {}
   try {
-    shippingAddressObj = JSON.parse(order.shippingAddress)
+    shippingAddressObj = JSON.parse(order.shippingAddress) as ShippingAddress
   } catch (err) {
     console.error(`[notify] Failed to parse shipping address JSON for order ${orderId}:`, err)
   }
@@ -147,9 +159,9 @@ export async function notifyOrderStatusChanged(
 
   const { order, user } = data
 
-  let shippingAddressObj: any = {}
+  let shippingAddressObj: ShippingAddress = {}
   try {
-    shippingAddressObj = JSON.parse(order.shippingAddress)
+    shippingAddressObj = JSON.parse(order.shippingAddress) as ShippingAddress
   } catch (err) {
     console.error(`[notify] Failed to parse shipping address JSON for order ${orderId}:`, err)
   }
@@ -204,9 +216,9 @@ export async function notifyOrderCancelled(orderId: string): Promise<void> {
 
   const { order, user } = data
 
-  let shippingAddressObj: any = {}
+  let shippingAddressObj: ShippingAddress = {}
   try {
-    shippingAddressObj = JSON.parse(order.shippingAddress)
+    shippingAddressObj = JSON.parse(order.shippingAddress) as ShippingAddress
   } catch (err) {
     console.error(`[notify] Failed to parse shipping address JSON for order ${orderId}:`, err)
   }

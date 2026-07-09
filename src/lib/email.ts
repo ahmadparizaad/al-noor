@@ -211,9 +211,10 @@ export async function sendVerificationEmail({
     }
 
     return { success: true, id: response.data?.id }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[email] Exception sending verification email:', err)
-    return { success: false, error: err.message || String(err) }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }
 
@@ -330,9 +331,10 @@ export async function sendOrderConfirmationEmail({
     }
 
     return { success: true, id: response.data?.id }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[email] Exception sending order confirmation email:', err)
-    return { success: false, error: err.message || String(err) }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }
 
@@ -387,9 +389,10 @@ export async function sendOrderCancellationEmail({
     }
 
     return { success: true, id: response.data?.id }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[email] Exception sending cancellation email:', err)
-    return { success: false, error: err.message || String(err) }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }
 
@@ -465,8 +468,9 @@ export async function sendOrderStatusUpdateEmail({
     }
 
     return { success: true, id: response.data?.id }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[email] Exception sending status update email:', err)
-    return { success: false, error: err.message || String(err) }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }

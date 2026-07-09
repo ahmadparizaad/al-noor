@@ -1,10 +1,10 @@
 import NextAuth from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { db } from './db'
-import { users, refreshTokens } from './schema'
+import { users, refreshTokens, phoneOtps } from './schema'
 import { eq, and, lt, isNotNull } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
-import { createHash, randomBytes } from 'crypto'
+import { createHash, randomBytes, randomUUID } from 'crypto'
 import { z } from 'zod'
 import type { UserRole } from '@/types'
 import { checkRateLimit } from './rate-limit'
@@ -121,6 +121,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           ...token,
           id:           user.id,
           role:         (user as { role?: string }).role,
+          phone:        (user as { phone?: string }).phone,
+          email:        user.email,
           accessExpiry: nowSec() + ACCESS_TOKEN_MAX_AGE,
           refreshToken,
         }
@@ -159,6 +161,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (token) {
         session.user.id   = token.id as string
         session.user.role = token.role as UserRole
+        session.user.email = token.email as string
+        session.user.phone = token.phone as string | undefined
         // Surface the error so client can handle forced re-login
         session.error = token.error as typeof session.error
       }
@@ -174,6 +178,77 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const rl = checkRateLimit({ key: `login:${ip}`, limit: 10, windowMs: 15 * 60 * 1000 })
         if (!rl.allowed) return null  // Auth.js converts null → CredentialsSignin error
 
+        // ── WhatsApp OTP Sign-In Path ──
+        if (credentials && 'phone' in credentials && 'otp' in credentials) {
+          const phoneCred = credentials.phone as string
+          const otpCred = credentials.otp as string
+
+          if (!phoneCred || !otpCred) return null
+
+          const rawPhone = phoneCred.replace(/\D/g, '')
+          const phone = rawPhone.startsWith('91') && rawPhone.length === 12 ? rawPhone.slice(2) : rawPhone
+
+          const [otpRecord] = await db
+            .select()
+            .from(phoneOtps)
+            .where(eq(phoneOtps.phone, phone))
+            .limit(1)
+
+          if (!otpRecord) return null
+          if (otpRecord.expiresAt < new Date()) return null
+          if (otpRecord.attempts >= 3) return null
+
+          const hashedSubmittedOtp = createHash('sha256').update(otpCred).digest('hex')
+          if (hashedSubmittedOtp !== otpRecord.otpHash) {
+            await db
+              .update(phoneOtps)
+              .set({ attempts: otpRecord.attempts + 1 })
+              .where(eq(phoneOtps.id, otpRecord.id))
+            return null
+          }
+
+          // OTP is valid. Clean up the OTP record to prevent replay attacks.
+          await db.delete(phoneOtps).where(eq(phoneOtps.id, otpRecord.id))
+
+          // Check if user exists
+          const [existingUser] = await db
+            .select()
+            .from(users)
+            .where(eq(users.phone, phone))
+            .limit(1)
+
+          if (existingUser) {
+            return {
+              id: existingUser.id,
+              email: existingUser.email,
+              name: existingUser.name,
+              phone: existingUser.phone,
+              role: existingUser.role as UserRole,
+            }
+          }
+
+          // Auto-signup customer
+          const userId = randomUUID()
+          const placeholderEmail = `${phone}@alnoor.co`
+          await db.insert(users).values({
+            id: userId,
+            phone: phone,
+            email: placeholderEmail,
+            name: 'Guest',
+            role: 'customer',
+            emailVerified: new Date(),
+          })
+
+          return {
+            id: userId,
+            email: placeholderEmail,
+            name: 'Guest',
+            phone: phone,
+            role: 'customer' as UserRole,
+          }
+        }
+
+        // ── Standard Email/Password Sign-In Path ──
         const parsed = loginSchema.safeParse(credentials)
         if (!parsed.success) return null
 
@@ -188,10 +263,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.passwordHash)
         if (!valid) return null
 
+        // Enforce email verification for customers
+        if (user.role === 'customer' && !user.emailVerified) {
+          return null
+        }
+
         return {
           id:    user.id,
           email: user.email,
           name:  user.name,
+          phone: user.phone,
           role:  user.role as UserRole,
         }
       },

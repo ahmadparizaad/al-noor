@@ -360,6 +360,29 @@ export function OrdersClient({ initialOrders }: OrdersClientProps) {
                       }}
                     >
                       <Link
+                        href={`/orders/${order.id}`}
+                        style={{
+                          height: 34,
+                          lineHeight: '34px',
+                          padding: '0 18px',
+                          background: 'transparent',
+                          color: T.goldDark,
+                          border: `1.5px solid ${T.gold}`,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          textDecoration: 'none',
+                          borderRadius: 2,
+                          textAlign: 'center',
+                          display: 'inline-block',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = T.goldPale }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        View Details
+                      </Link>
+                      <Link
                         href={`/track-order?orderId=${order.id}`}
                         style={{
                           height: 36,

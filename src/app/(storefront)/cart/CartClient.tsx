@@ -233,7 +233,7 @@ export function CartClient() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: isMobile ? 8 : 16 }}>
                 {[
                   { icon: '🛡️', title: '5-Year Warranty', sub: 'Full movement coverage' },
-                  { icon: '📦', title: 'Free Returns', sub: '30-day hassle-free policy' },
+                  { icon: '📦', title: 'Insured Shipping', sub: 'Delivered via Delhivery' },
                   { icon: '💵', title: 'Cash on Delivery', sub: 'COD via Delhivery' },
                 ].map(g => (
                   <div key={g.title} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: isMobile ? 4 : 6 }}>

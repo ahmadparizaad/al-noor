@@ -99,22 +99,25 @@ export function CheckoutClient() {
   // Load saved addresses for logged-in users
   useEffect(() => {
     if (!isLoggedIn) return
-    setLoadingSaved(true)
-    fetch('/api/user/addresses')
-      .then(r => r.json())
-      .then((data: SavedAddress[]) => {
-        setSavedAddresses(data)
-        const def = data.find(a => a.isDefault) ?? data[0]
-        if (def) {
-          setSelectedAddrId(def.id)
-          setAddress({ fullName: def.fullName, phone: def.phone, line1: def.line1, line2: def.line2 ?? '', city: def.city, state: def.state, pincode: def.pincode })
-          setShowNewForm(false)
-        } else {
-          setShowNewForm(true)
-        }
-      })
-      .catch(() => setShowNewForm(true))
-      .finally(() => setLoadingSaved(false))
+    const timer = setTimeout(() => {
+      setLoadingSaved(true)
+      fetch('/api/user/addresses')
+        .then(r => r.json())
+        .then((data: SavedAddress[]) => {
+          setSavedAddresses(data)
+          const def = data.find(a => a.isDefault) ?? data[0]
+          if (def) {
+            setSelectedAddrId(def.id)
+            setAddress({ fullName: def.fullName, phone: def.phone, line1: def.line1, line2: def.line2 ?? '', city: def.city, state: def.state, pincode: def.pincode })
+            setShowNewForm(false)
+          } else {
+            setShowNewForm(true)
+          }
+        })
+        .catch(() => setShowNewForm(true))
+        .finally(() => setLoadingSaved(false))
+    }, 0)
+    return () => clearTimeout(timer)
   }, [isLoggedIn])
 
   function selectSavedAddress(addr: SavedAddress) {
@@ -519,7 +522,7 @@ export function CheckoutClient() {
           </div>
 
           <div style={{ marginTop: 12, fontSize: 12, color: T.muted, lineHeight: 2 }}>
-            {['🛡️  5-Year Warranty included', '📦  Free insured worldwide delivery', '↩️  30-day hassle-free returns'].map(g => (
+            {['🛡️  5-Year Warranty included', '📦  Free insured worldwide delivery'].map(g => (
               <div key={g}>{g}</div>
             ))}
           </div>

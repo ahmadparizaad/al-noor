@@ -60,6 +60,43 @@ export function PDPClient({
   const { addItem } = useCart()
   const router = useRouter()
 
+  const [pincode, setPincode] = useState('')
+  const [serviceabilityLoading, setServiceabilityLoading] = useState(false)
+  const [serviceabilityResult, setServiceabilityResult] = useState<{
+    isServiceable: boolean
+    isCod: boolean
+    isPrepaid: boolean
+    district?: string
+    state?: string
+    estimatedDeliveryDays?: string
+  } | null>(null)
+  const [pincodeError, setPincodeError] = useState<string | null>(null)
+
+  async function handleCheckPincode() {
+    if (!/^\d{6}$/.test(pincode)) {
+      setPincodeError('Please enter a valid 6-digit pincode.')
+      setServiceabilityResult(null)
+      return
+    }
+    setPincodeError(null)
+    setServiceabilityLoading(true)
+    try {
+      const res = await fetch(`/api/shipping/serviceability?pincode=${pincode}`)
+      if (!res.ok) {
+        setPincodeError('Unable to verify serviceability. Please try again.')
+        setServiceabilityResult(null)
+        return
+      }
+      const data = await res.json()
+      setServiceabilityResult(data)
+    } catch {
+      setPincodeError('Failed to check serviceability.')
+      setServiceabilityResult(null)
+    } finally {
+      setServiceabilityLoading(false)
+    }
+  }
+
   const p = initial
 
   function showToast(msg: string) {
@@ -265,12 +302,108 @@ export function PDPClient({
               </div>
             </div>
 
-            {/* Delivery */}
+            {/* Delivery & Pincode Checker */}
             <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 16, marginBottom: 20 }}>
+              {/* Pincode Checker */}
+              <div style={{ marginBottom: 18 }}>
+                <label htmlFor="pincode-input" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: T.deep, marginBottom: 6, fontFamily: "'Raleway', sans-serif" }}>
+                  Check Delivery Pincode
+                </label>
+                <div style={{ display: 'flex', gap: 8, maxWidth: 320 }}>
+                  <input
+                    id="pincode-input"
+                    type="text"
+                    placeholder="Enter 6-digit pincode"
+                    maxLength={6}
+                    value={pincode}
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '')
+                      setPincode(val)
+                      if (pincodeError) setPincodeError(null)
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        handleCheckPincode()
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      height: 36,
+                      border: `1.5px solid ${pincodeError ? T.red : T.border}`,
+                      borderRadius: 2,
+                      padding: '0 12px',
+                      fontSize: 13,
+                      fontFamily: "'Inter', sans-serif",
+                      color: T.deep,
+                      outline: 'none',
+                      background: T.white,
+                    }}
+                  />
+                  <button
+                    onClick={handleCheckPincode}
+                    disabled={serviceabilityLoading}
+                    style={{
+                      height: 36,
+                      padding: '0 16px',
+                      background: T.gold,
+                      color: T.white,
+                      border: 'none',
+                      borderRadius: 2,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      fontFamily: "'Raleway', sans-serif",
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = T.goldDark)}
+                    onMouseLeave={e => (e.currentTarget.style.background = T.gold)}
+                  >
+                    {serviceabilityLoading ? 'Checking...' : 'Check'}
+                  </button>
+                </div>
+                
+                {pincodeError && (
+                  <div style={{ color: T.red, fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, fontFamily: "'Inter', sans-serif" }}>
+                    <span style={{ fontSize: 14 }}>⚠️</span> {pincodeError}
+                  </div>
+                )}
+
+                {serviceabilityResult && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: '10px 12px',
+                    borderRadius: 2,
+                    background: serviceabilityResult.isServiceable ? 'rgba(39, 134, 74, 0.06)' : 'rgba(192, 57, 43, 0.06)',
+                    border: `1px solid ${serviceabilityResult.isServiceable ? 'rgba(39, 134, 74, 0.15)' : 'rgba(192, 57, 43, 0.15)'}`,
+                    fontSize: 13,
+                    fontFamily: "'Inter', sans-serif",
+                    color: serviceabilityResult.isServiceable ? T.deep : T.red,
+                    maxWidth: 320
+                  }}>
+                    {serviceabilityResult.isServiceable ? (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: T.green, fontWeight: 600, marginBottom: 4 }}>
+                          <span>✓</span> Serviceable to {serviceabilityResult.district || 'your location'}
+                        </div>
+                        <div style={{ fontSize: 12, color: T.mid, lineHeight: 1.4 }}>
+                          🚚 Expected delivery: <strong>{serviceabilityResult.estimatedDeliveryDays || '3-5 days'}</strong>
+                        </div>
+                        <div style={{ fontSize: 12, color: T.mid, lineHeight: 1.4, marginTop: 2 }}>
+                          💵 Cash on Delivery (COD): <strong>{serviceabilityResult.isCod ? 'Available' : 'Not Available'}</strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500 }}>
+                        <span>✕</span> Delivery is not available to this pincode via Delhivery.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {[
                 { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="1.8"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m0 0h3l3 4v4h-3m-3-7H9"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>, text: <><strong style={{ color: T.deep }}>Free Delivery</strong> — Arrives within 7–14 business days via insured courier.</> },
                 { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="1.8"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>, text: <>Delivery to <strong style={{ color: T.deep }}>worldwide destinations</strong> — Insured, discreet packaging</> },
-                { icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="1.8"><path d="M9 14l-4-4 4-4m6 8l4-4-4-4"/></svg>, text: <><strong style={{ color: T.deep }}>30-Day Returns</strong> — Hassle-free return policy.</> },
               ].map((row, i) => (
                 <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 12, fontSize: 13, color: T.mid }}>
                   <div style={{ flexShrink: 0, marginTop: 1 }}>{row.icon}</div>
@@ -287,8 +420,8 @@ export function PDPClient({
 
             {/* Description */}
             <div style={{ fontFamily: "'EB Garamond', serif", fontSize: 16, color: T.mid, lineHeight: 1.7 }}>
-              <p style={{ marginBottom: 10 }}>The <strong style={{ color: T.deep, fontFamily: "'Raleway', sans-serif", fontSize: 13, fontWeight: 600 }}>{p.name}</strong> exemplifies Al Noor's commitment to the fusion of Islamic geometric heritage and Swiss horological mastery. Crafted in {p.material} and featuring a {p.dial} dial, this {p.category.toLowerCase()} is a testament to over two thousand hours of hand-finishing at our Geneva atelier.</p>
-              <p style={{ marginBottom: 10 }}>The movement, calibre {p.ref.replace(/-/g, '.')}, is assembled by a single watchmaker across fourteen weeks. The dial's geometry derives directly from the eight-point star tessellations of ninth-century Andalusian architecture.</p>
+              <p style={{ marginBottom: 10 }}>The <strong style={{ color: T.deep, fontFamily: "'Raleway', sans-serif", fontSize: 13, fontWeight: 600 }}>{p.name}</strong> exemplifies Al Noor&apos;s commitment to the fusion of Islamic geometric heritage and Swiss horological mastery. Crafted in {p.material} and featuring a {p.dial} dial, this {p.category.toLowerCase()} is a testament to over two thousand hours of hand-finishing at our Geneva atelier.</p>
+              <p style={{ marginBottom: 10 }}>The movement, calibre {p.ref.replace(/-/g, '.')}, is assembled by a single watchmaker across fourteen weeks. The dial&apos;s geometry derives directly from the eight-point star tessellations of ninth-century Andalusian architecture.</p>
               <p>Every Al Noor timepiece ships with a certificate of provenance, leather watch roll, and a handwritten note from the atelier chief. A five-year full service warranty is included as standard.</p>
             </div>
           </div>

@@ -7,7 +7,7 @@ import { auth } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { AdminOrder, AdminCustomer, AdminProduct, RevenueMonth } from '@/types/admin'
 import { createDelhiveryShipment } from '@/lib/delhivery'
-import { notifyOrderStatusChanged } from '@/lib/notifications'
+import { notifyOrderStatusChanged, OrderEvent } from '@/lib/notifications'
 
 async function requireAdmin() {
   const session = await auth()
@@ -248,7 +248,7 @@ export async function updateOrderStatus(orderId: string, status: string, trackin
   // Trigger order status update notifications asynchronously (both Email and WhatsApp)
   notifyOrderStatusChanged(
     orderId,
-    status as any,
+    status as OrderEvent,
     trackingToSave || order.trackingNumber
   ).catch(err => {
     console.error('[admin-order] Failed to dispatch order status notifications:', err)

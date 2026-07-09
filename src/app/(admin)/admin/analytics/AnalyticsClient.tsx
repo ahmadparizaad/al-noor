@@ -109,6 +109,50 @@ function filterOrdersByRange(orders: AdminOrder[], from: Date, to: Date): AdminO
   })
 }
 
+const StatCard = ({
+  label,
+  value,
+  isPrice = false,
+}: {
+  label: string
+  value: string | number
+  isPrice?: boolean
+}) => (
+  <div
+    style={{
+      background: T.card,
+      border: `1px solid ${T.border}`,
+      borderRadius: '4px',
+      padding: '24px',
+      boxShadow: T.shadowSm,
+    }}
+  >
+    <div
+      style={{
+        fontFamily: DATA,
+        fontSize: '11px',
+        letterSpacing: '0.08em',
+        color: T.muted,
+        textTransform: 'uppercase',
+        marginBottom: '16px',
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        fontFamily: DATA,
+        fontSize: '28px',
+        fontVariantNumeric: 'tabular-nums',
+        color: isPrice ? T.gold : T.deep,
+        fontWeight: 600,
+      }}
+    >
+      {value}
+    </div>
+  </div>
+)
+
 export default function AnalyticsClient({
   revenue,
   orders,
@@ -165,50 +209,6 @@ export default function AnalyticsClient({
   }))
 
   const maxRevenue = Math.max(...revenue.map(m => m.revenueInr), 1)
-
-  const StatCard = ({
-    label,
-    value,
-    isPrice = false,
-  }: {
-    label: string
-    value: string | number
-    isPrice?: boolean
-  }) => (
-    <div
-      style={{
-        background: T.card,
-        border: `1px solid ${T.border}`,
-        borderRadius: '4px',
-        padding: '24px',
-        boxShadow: T.shadowSm,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: DATA,
-          fontSize: '11px',
-          letterSpacing: '0.08em',
-          color: T.muted,
-          textTransform: 'uppercase',
-          marginBottom: '16px',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: DATA,
-          fontSize: '28px',
-          fontVariantNumeric: 'tabular-nums',
-          color: isPrice ? T.gold : T.deep,
-          fontWeight: 600,
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  )
 
   return (
     <div>

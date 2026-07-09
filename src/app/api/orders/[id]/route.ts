@@ -79,8 +79,8 @@ export async function GET(
   const estimatedDelivery = new Date(order.createdAt.getTime() + 7 * 24 * 3600 * 1000).toISOString()
 
   let events: Array<{ status: string; location: string; timestamp: string; note?: string }> = []
-  
-  // If order is shipped/processing and has a tracking number, fetch live tracking updates
+
+  // Only real Delhivery scan data is shown — no synthesized/fabricated events.
   if (order.trackingNumber) {
     try {
       const trackingInfo = await trackDelhiveryShipment(order.trackingNumber)
@@ -94,42 +94,6 @@ export async function GET(
       }
     } catch (err) {
       console.error('Failed to fetch live Delhivery tracking info:', err)
-    }
-  }
-
-  // If no tracking events found but order status is confirmed, processing or shipped, add initial steps
-  if (events.length === 0) {
-    if (order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
-      events.push({
-        status: 'Order Confirmed',
-        location: 'Al Noor Atelier, Gurugram',
-        timestamp: order.createdAt.toISOString(),
-        note: 'Order verification complete. Preparing timepiece in atelier.',
-      })
-    }
-    if (order.status === 'processing' || order.status === 'shipped' || order.status === 'delivered') {
-      events.push({
-        status: 'Atelier Processing',
-        location: 'Al Noor Atelier, Gurugram',
-        timestamp: new Date(order.createdAt.getTime() + 2 * 3600 * 1000).toISOString(),
-        note: 'Timepiece undergo regulatory inspection and packing.',
-      })
-    }
-    if (order.status === 'shipped' || order.status === 'delivered') {
-      events.push({
-        status: 'Shipped',
-        location: 'Delhi NCR Hub',
-        timestamp: new Date(order.createdAt.getTime() + 24 * 3600 * 1000).toISOString(),
-        note: `Dispatched via Delhivery Express. Waybill: ${order.trackingNumber}`,
-      })
-    }
-    if (order.status === 'delivered') {
-      events.push({
-        status: 'Delivered',
-        location: address.city,
-        timestamp: new Date(order.createdAt.getTime() + 72 * 3600 * 1000).toISOString(),
-        note: 'Shipment delivered to customer.',
-      })
     }
   }
 

@@ -293,7 +293,7 @@ export default function ProfileClient({ id, name, email, createdAt }: Props) {
                 onBlur={() => setEmailFocused(null)}
               />
               <div style={{ fontFamily: DATA, fontSize: 11, color: T.muted }}>
-                You'll need to sign in again after changing your email.
+                You&apos;ll need to sign in again after changing your email.
               </div>
               <SaveButton pending={emailPending} />
               <StatusBanner state={emailState} />

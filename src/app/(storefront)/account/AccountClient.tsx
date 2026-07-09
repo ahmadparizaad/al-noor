@@ -94,7 +94,12 @@ export function AccountClient() {
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login?callbackUrl=/account')
-    if (status === 'authenticated')  fetchAddresses()
+    if (status === 'authenticated') {
+      const timer = setTimeout(() => {
+        fetchAddresses()
+      }, 0)
+      return () => clearTimeout(timer)
+    }
   }, [status, router, fetchAddresses])
 
   async function handleSaveAddress(e: React.FormEvent) {

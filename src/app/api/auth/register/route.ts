@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { users } from '@/lib/schema'
+import { users, verificationTokens } from '@/lib/schema'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
-import { randomUUID } from 'crypto'
+import { randomUUID, createHash } from 'crypto'
 import { z } from 'zod'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { sendVerificationEmail } from '@/lib/email'
 
 const registerSchema = z.object({
   name:     z.string().min(2).max(100),
@@ -41,16 +42,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true }, { status: 201 })
   }
 
+  const userId = randomUUID()
+  const token = randomUUID()
+  const tokenHash = createHash('sha256').update(token).digest('hex')
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+
   const passwordHash = await bcrypt.hash(password, 12)
 
-  await db.insert(users).values({
-    id:           randomUUID(),
-    email,
-    name,
-    phone:        phone ?? null,
-    passwordHash,
-    role:         'customer',
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({
+      id:           userId,
+      email,
+      name,
+      phone:        phone ?? null,
+      passwordHash,
+      role:         'customer',
+    })
+
+    await tx.insert(verificationTokens).values({
+      id: randomUUID(),
+      userId,
+      tokenHash,
+      expiresAt,
+    })
   })
+
+  // Send verification email after transaction commits
+  try {
+    await sendVerificationEmail({ email, name, token })
+  } catch (err) {
+    console.error('[register] Failed to send verification email:', err)
+  }
 
   return NextResponse.json({ success: true }, { status: 201 })
 }
+

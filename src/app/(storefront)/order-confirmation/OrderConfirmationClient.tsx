@@ -26,13 +26,39 @@ const T = {
 }
 
 type PaymentStatus = 'loading' | 'success' | 'failed' | 'pending' | 'cod'
+type OrderStatus = 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
+
+function orderStatusLabel(status: OrderStatus | undefined): string {
+  switch (status) {
+    case 'cancelled': return 'Cancelled'
+    case 'refunded':  return 'Refunded'
+    case 'delivered':
+    case 'shipped':
+    case 'processing':
+    case 'confirmed':
+      return 'Confirmed'
+    default: return 'Pending'
+  }
+}
+
+function dispatchStatusLabel(status: OrderStatus | undefined): string {
+  switch (status) {
+    case 'shipped':   return 'Shipped'
+    case 'delivered': return 'Delivered'
+    case 'processing': return 'Processing'
+    case 'cancelled': return 'Cancelled'
+    default: return 'Awaiting dispatch'
+  }
+}
 
 interface OrderDetail {
   id: string
-  status: string
+  status: OrderStatus
   paymentStatus: string
   totalInr: string
+  trackingNumber: string | null
   createdAt: string
+  estimatedDelivery: string
 }
 
 function ConfirmationInner() {
@@ -45,10 +71,9 @@ function ConfirmationInner() {
   const [order, setOrder]         = useState<OrderDetail | null>(null)
   const [error, setError]         = useState<string | null>(null)
 
-  // Estimated delivery: 7 business days from now
-  const deliveryDate = new Date()
-  deliveryDate.setDate(deliveryDate.getDate() + 10)
-  const deliveryStr = deliveryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const deliveryStr = order?.estimatedDelivery
+    ? new Date(order.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null
 
   useEffect(() => {
     if (!orderId) {
@@ -82,10 +107,8 @@ function ConfirmationInner() {
           clearCart()
         }
       } catch {
-        // If API isn't wired yet (no DB), show success state for demo
-        setPayStatus('success')
-        setOrder({ id: orderId, status: 'confirmed', paymentStatus: 'paid', totalInr: '0', createdAt: new Date().toISOString() })
-        clearCart()
+        setPayStatus('failed')
+        setError('Could not load order. Please check your connection and try again.')
       }
     }
     fetchStatus()
@@ -136,8 +159,8 @@ function ConfirmationInner() {
           {payStatus === 'pending'
             ? "Your payment is being verified. We'll confirm your order shortly."
             : payStatus === 'cod'
-            ? "Thank you for your order. Your order is confirmed and your timepiece will be prepared in our atelier. Please pay via Cash or UPI at the time of delivery."
-            : 'Thank you for your order. Your timepiece will be dispatched from our Geneva atelier.'}
+            ? "Thank you for your order. Your order is confirmed and will be prepared for dispatch. Please pay via Cash or UPI at the time of delivery."
+            : 'Thank you for your order. Your timepiece will be prepared and dispatched shortly.'}
         </p>
       </div>
 
@@ -151,7 +174,7 @@ function ConfirmationInner() {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 11, color: T.muted, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Order Date</div>
             <div style={{ fontSize: 13, color: T.deep, marginTop: 2 }}>
-              {order?.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+              {order?.createdAt ? new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
             </div>
           </div>
         </div>
@@ -161,8 +184,8 @@ function ConfirmationInner() {
           <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap' }}>
             {[
               { label: 'Payment', value: payStatus === 'success' ? 'Paid' : (payStatus === 'cod' ? 'Cash on Delivery' : 'Pending'), color: payStatus === 'success' ? T.green : (payStatus === 'cod' ? T.gold : '#D97706') },
-              { label: 'Order', value: 'Confirmed', color: T.green },
-              { label: 'Dispatch', value: 'Processing', color: '#9E7F4A' },
+              { label: 'Order', value: orderStatusLabel(order?.status), color: T.green },
+              { label: 'Dispatch', value: dispatchStatusLabel(order?.status), color: T.gold },
             ].map(pill => (
               <div key={pill.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 10, fontWeight: 600, color: T.muted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{pill.label}</span>
@@ -175,22 +198,25 @@ function ConfirmationInner() {
           </div>
 
           {/* Delivery timeline */}
-          <div style={{ background: '#EBF5EF', border: `1px solid #C3E0CC`, borderRadius: 2, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={T.green} strokeWidth="1.8"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m0 0h3l3 4v4h-3m-3-7H9"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: T.deep }}>Expected Delivery by {deliveryStr}</div>
-              <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>{payStatus === 'cod' ? 'Insured express courier via Delhivery · Pay on Delivery' : 'Insured express courier from Geneva · Signature required'}</div>
+          {deliveryStr && (
+            <div style={{ background: '#EBF5EF', border: `1px solid #C3E0CC`, borderRadius: 2, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={T.green} strokeWidth="1.8"><path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m0 0h3l3 4v4h-3m-3-7H9"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="17.5" cy="17.5" r="1.5"/></svg>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.deep }}>Expected Delivery by {deliveryStr}</div>
+                <div style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
+                  {order?.trackingNumber ? `Shipped via Delhivery · Tracking ${order.trackingNumber}` : 'Insured shipping via Delhivery'}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* What happens next */}
           <div style={{ fontSize: 13, fontWeight: 700, color: T.deep, marginBottom: 12 }}>What happens next?</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {[
               { icon: '📧', title: 'Confirmation email', sub: 'Order details sent to your registered email within 10 minutes' },
-              { icon: '⚙️', title: 'Atelier dispatch', sub: 'Your timepiece will be prepared and quality-checked at our Geneva atelier' },
-              { icon: '📦', title: 'Insured shipping', sub: 'Dispatched in secure, discreet packaging via DHL Express with tracking' },
-              { icon: '✍️', title: 'Handwritten note', sub: 'A personal note from our atelier chief accompanies every order' },
+              { icon: '📦', title: 'Preparing your order', sub: 'Your order is verified and packed for dispatch' },
+              { icon: '🚚', title: 'Insured shipping', sub: 'Dispatched in secure, discreet packaging via Delhivery with live tracking' },
             ].map((step, i, arr) => (
               <div key={step.title} style={{ display: 'flex', gap: 14, paddingBottom: i < arr.length - 1 ? 16 : 0, marginBottom: i < arr.length - 1 ? 16 : 0, borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : 'none', alignItems: 'flex-start' }}>
                 <span style={{ fontSize: 20, flexShrink: 0 }}>{step.icon}</span>

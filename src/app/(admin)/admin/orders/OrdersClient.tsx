@@ -137,17 +137,22 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
   const handleSaveOrder = async (orderId: string) => {
     const newStatus = editingStatus[orderId]
     const newTracking = trackingNumbers[orderId]
+    let saved = false
 
     if (newStatus) {
       try {
         const result = await updateOrderStatus(orderId, newStatus, newTracking)
-        const savedTracking = result?.trackingNumber || newTracking
-
-        setOrders(orders.map(o =>
-          o.id === orderId
-            ? { ...o, status: newStatus, trackingNumber: savedTracking || o.trackingNumber }
-            : o
-        ))
+        if (!result?.success) {
+          alert(result?.error || 'Failed to update order status.')
+        } else {
+          const savedTracking = result.trackingNumber || newTracking
+          setOrders(orders.map(o =>
+            o.id === orderId
+              ? { ...o, status: newStatus, trackingNumber: savedTracking || o.trackingNumber }
+              : o
+          ))
+          saved = true
+        }
       } catch (err) {
         console.error('Failed to save order updates:', err)
         alert('Failed to save order updates. Please check authorization.')
@@ -157,17 +162,25 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
         const currentOrder = orders.find(o => o.id === orderId)
         const status = currentOrder?.status || 'pending'
         const result = await updateOrderStatus(orderId, status, newTracking)
-        
-        setOrders(orders.map(o =>
-          o.id === orderId
-            ? { ...o, trackingNumber: newTracking }
-            : o
-        ))
+        if (!result?.success) {
+          alert(result?.error || 'Failed to update tracking number.')
+        } else {
+          setOrders(orders.map(o =>
+            o.id === orderId
+              ? { ...o, trackingNumber: newTracking }
+              : o
+          ))
+          saved = true
+        }
       } catch (err) {
         console.error('Failed to save tracking number:', err)
         alert('Failed to save tracking number. Please check authorization.')
       }
     }
+
+    // Only close the editing row once the save actually succeeded, so a
+    // rejected status change (e.g. missing tracking number) stays visible for the admin to fix.
+    if (!saved) return
 
     setEditingStatus(prev => {
       const newState = { ...prev }
@@ -176,8 +189,9 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
     })
   }
 
-  const FilterTab = ({ label, status }: { label: string; status: OrderStatus | 'all' }) => (
+  const renderFilterTab = (label: string, status: OrderStatus | 'all') => (
     <button
+      key={status}
       onClick={() => setFilter(status)}
       style={{
         padding: '8px 16px',
@@ -283,13 +297,13 @@ export default function OrdersClient({ initialOrders }: OrdersClientProps) {
 
         {/* Status filter tabs */}
         <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-          <FilterTab label="All" status="all" />
-          <FilterTab label="Pending" status="pending" />
-          <FilterTab label="Confirmed" status="confirmed" />
-          <FilterTab label="Processing" status="processing" />
-          <FilterTab label="Shipped" status="shipped" />
-          <FilterTab label="Delivered" status="delivered" />
-          <FilterTab label="Cancelled" status="cancelled" />
+          {renderFilterTab("All", "all")}
+          {renderFilterTab("Pending", "pending")}
+          {renderFilterTab("Confirmed", "confirmed")}
+          {renderFilterTab("Processing", "processing")}
+          {renderFilterTab("Shipped", "shipped")}
+          {renderFilterTab("Delivered", "delivered")}
+          {renderFilterTab("Cancelled", "cancelled")}
         </div>
       </div>
 

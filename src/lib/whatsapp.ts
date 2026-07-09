@@ -87,9 +87,10 @@ async function sendWhatsAppTemplate({
 
     const typedData = data as MetaApiResponse
     return { success: true, messageId: typedData.messages?.[0]?.id }
-  } catch (err: any) {
+  } catch (err) {
     console.error('[whatsapp] Exception sending WhatsApp:', err)
-    return { success: false, error: err.message || String(err) }
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    return { success: false, error: errorMsg }
   }
 }
 
