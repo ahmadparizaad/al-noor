@@ -112,7 +112,7 @@ function AdminLoginInner() {
                 onFocus={() => setFocused('email')}
                 onBlur={() => setFocused(null)}
                 required
-                placeholder="admin@al-noor.co"
+                placeholder="admin@al-noorluxury.com"
                 style={{
                   height: 42,
                   background: T.inputBg,

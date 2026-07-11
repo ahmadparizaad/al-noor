@@ -45,7 +45,7 @@ export default function AdminSidebar({ userName }: AdminSidebarProps) {
     return pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href))
   }
 
-  const userEmail = userName.includes('@') ? userName : userName + '@al-noor.co'
+  const userEmail = userName.includes('@') ? userName : userName + '@al-noorluxury.com'
 
   return (
     <aside

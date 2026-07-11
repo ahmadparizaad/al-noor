@@ -5,7 +5,7 @@
  *   npx tsx scripts/seed-admin.ts <email> <password>
  *
  * Examples:
- *   npx tsx scripts/seed-admin.ts admin@al-noor.co MySecurePassword123
+ *   npx tsx scripts/seed-admin.ts admin@al-noorluxury.com MySecurePassword123
  *
  * If the email already exists, the script promotes that user to admin
  * and (optionally) updates their password if a new one is provided.

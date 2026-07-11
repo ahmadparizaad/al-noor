@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       .limit(1)
 
     if (!user) {
-      return NextResponse.json({ exists: false, verified: true })
+      return NextResponse.json({ exists: false, verified: false })
     }
 
     // Admins are not subject to customer email verification checks

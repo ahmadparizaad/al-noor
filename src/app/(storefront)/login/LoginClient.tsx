@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
@@ -50,7 +50,7 @@ function LoginInner() {
   const [mode, setMode]       = useState<Mode>('login')
   const [loginMethod, setLoginMethod] = useState<'whatsapp' | 'email'>('email')
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [error, setError]     = useState<ReactNode | null>(null)
   const [success, setSuccess] = useState<string | null>(
     reason === 'session_expired' ? 'Your session has expired. Please sign in again to continue.' : null
   )
@@ -74,10 +74,43 @@ function LoginInner() {
     try {
       const checkRes = await fetch(`/api/auth/check-verified?email=${encodeURIComponent(loginEmail)}`)
       const checkData = await checkRes.json()
-      if (checkRes.ok && checkData.exists && !checkData.verified) {
-        setError('Please verify your email address before logging in. A verification link was sent to your email.')
-        setLoading(false)
-        return
+      if (checkRes.ok) {
+        if (!checkData.exists) {
+          setError(
+            <>
+              This email is not registered.{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('register')
+                  setRegEmail(loginEmail)
+                  setError(null)
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: T.gold,
+                  textDecoration: 'underline',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  padding: 0,
+                  fontWeight: 600,
+                }}
+              >
+                Create an account
+              </button>{' '}
+              first.
+            </>
+          )
+          setLoading(false)
+          return
+        }
+        if (!checkData.verified) {
+          setError('Please verify your email address before logging in. A verification link was sent to your email.')
+          setLoading(false)
+          return
+        }
       }
     } catch (err) {
       // Raw console.error is used here as a minimal logging fallback because the project does not have a centralized logger utility.

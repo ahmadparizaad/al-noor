@@ -8,6 +8,10 @@ if (!resend) {
   console.warn('[email] RESEND_API_KEY is not set. Emails will be logged to console instead of sent.')
 }
 
+const isDev = process.env.NODE_ENV === 'development'
+const FROM_NOREPLY = isDev ? 'onboarding@resend.dev' : 'Al Noor Luxury <noreply@al-noorluxury.com>'
+const FROM_ORDERS = isDev ? 'onboarding@resend.dev' : 'Al Noor Luxury <orders@al-noorluxury.com>'
+
 interface OrderItem {
   productName: string
   quantity: number
@@ -199,7 +203,7 @@ export async function sendVerificationEmail({
 
   try {
     const response = await resend.emails.send({
-      from: 'Al Noor Luxury <noreply@al-noor.co>',
+      from: FROM_NOREPLY,
       to: email,
       subject: 'Verify your Al Noor Account',
       html,
@@ -319,7 +323,7 @@ export async function sendOrderConfirmationEmail({
 
   try {
     const response = await resend.emails.send({
-      from: 'Al Noor Luxury <orders@al-noor.co>',
+      from: FROM_ORDERS,
       to: email,
       subject: `Your Al Noor Order Confirmation (${orderDetails.id})`,
       html,
@@ -377,7 +381,7 @@ export async function sendOrderCancellationEmail({
 
   try {
     const response = await resend.emails.send({
-      from: 'Al Noor Luxury <orders@al-noor.co>',
+      from: FROM_ORDERS,
       to: email,
       subject: `Your Al Noor Order has been Cancelled (${orderId})`,
       html,
@@ -456,7 +460,7 @@ export async function sendOrderStatusUpdateEmail({
 
   try {
     const response = await resend.emails.send({
-      from: 'Al Noor Luxury <orders@al-noor.co>',
+      from: FROM_ORDERS,
       to: email,
       subject: `Al Noor Order Status Update: ${statusLabel} (${orderId})`,
       html,

@@ -278,7 +278,7 @@ export default function ProfileClient({ id, name, email, createdAt }: Props) {
                 name="email"
                 type="email"
                 defaultValue={email}
-                placeholder="admin@al-noor.co"
+                placeholder="admin@al-noorluxury.com"
                 focused={emailFocused === 'email'}
                 onFocus={() => setEmailFocused('email')}
                 onBlur={() => setEmailFocused(null)}
